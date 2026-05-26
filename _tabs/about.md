@@ -65,37 +65,37 @@ title: 關於
 以下為過去參與合作與測試之作品集：
 
 ### <i class="fas fa-mobile-alt"></i> Nothing Tech Taiwan
-- [從 Android 系統開發者的角度評價 Nothing Phone(1)](https://bluehomewu.github.io/posts/Nothing-Phone-1-Review-From-An-Android-Developers-Perspective/)
-- [不同以往的 Nothing Phone：睽違已久的 Mediatek](https://bluehomewu.github.io/posts/A-Different-Nothing-Phone-Finally-Mediatek/)
-- [Nothing Ear / Ear (a) 實際體驗：Nothing Ear (2) 使用者親自分享](https://bluehomewu.github.io/posts/Nothing-Ear-and-Ear-a-Hands-On-by-Ear-2-User/)
-- [流著 Nothing OS 血液的平價版 Nothing Phone：CMF By Nothing Phone 1](https://bluehomewu.github.io/posts/The-Affordable-Nothing-Phone-With-Nothing-OS-Blood-CMF-By-Nothing-Phone-1/)
-- [CMF 家族再添一員：CMF By Nothing Watch Pro 2 臺灣搶先上手體驗](https://bluehomewu.github.io/posts/CMF-Family-New-Member-CMF-By-Nothing-Watch-Pro-2-Hands-On/)
-- [Nothing Phone 3a 系列評測：性能、攝影與設計的全面升級？](https://bluehomewu.github.io/posts/Nothing-Phone-3a-Series-Review-Performance-Camera-and-Design-Upgrade/)
-- [潮流設計×高性價比：CMF by Nothing Phone 2 Pro 完整開箱](https://bluehomewu.github.io/posts/Stylish-Design-Meets-High-Value-CMF-by-Nothing-Phone-2-Pro-Unboxing/)
-- [Glyph、鏡頭、續航一次看懂：Nothing Phone (3) 深度開箱](https://bluehomewu.github.io/posts/Nothing-Phone-3-In-Depth-Review-Glyph-Camera-Battery/)
-- [真實長測：Nothing Headphone (1) 降噪、通話、佩戴舒適度全記錄](https://bluehomewu.github.io/posts/Nothing-Headphone-1-Long-Term-Review/)
-- [Nothing Ear (3) & CMF Headphone Pro 評測：升級重點與差異整理：值得從前代升級嗎？](https://bluehomewu.github.io/posts/Nothing-Ear-3-and-CMF-Headphone-Pro-Review-and-Comparison/)
-- [Nothing Phone (4a) 系列評測：金屬機身、潛望長焦，重新定義中階旗艦？](https://bluehomewu.github.io/posts/Nothing-Phone-4a-Series-Review-Glyph-Matrix-Metal-Design-Snapdragon/)
-- [Nothing Headphone (a) 評測：更輕、更久、更平價的耳罩式新選擇](https://bluehomewu.github.io/posts/Nothing-Headphone-a-Review-ANC-Battery-Life-Design/)
+- [從 Android 系統開發者的角度評價 Nothing Phone(1)](https://edwardwu23.com/posts/Nothing-Phone-1-Review-From-An-Android-Developers-Perspective/)
+- [不同以往的 Nothing Phone：睽違已久的 Mediatek](https://edwardwu23.com/posts/A-Different-Nothing-Phone-Finally-Mediatek/)
+- [Nothing Ear / Ear (a) 實際體驗：Nothing Ear (2) 使用者親自分享](https://edwardwu23.com/posts/Nothing-Ear-and-Ear-a-Hands-On-by-Ear-2-User/)
+- [流著 Nothing OS 血液的平價版 Nothing Phone：CMF By Nothing Phone 1](https://edwardwu23.com/posts/The-Affordable-Nothing-Phone-With-Nothing-OS-Blood-CMF-By-Nothing-Phone-1/)
+- [CMF 家族再添一員：CMF By Nothing Watch Pro 2 臺灣搶先上手體驗](https://edwardwu23.com/posts/CMF-Family-New-Member-CMF-By-Nothing-Watch-Pro-2-Hands-On/)
+- [Nothing Phone 3a 系列評測：性能、攝影與設計的全面升級？](https://edwardwu23.com/posts/Nothing-Phone-3a-Series-Review-Performance-Camera-and-Design-Upgrade/)
+- [潮流設計×高性價比：CMF by Nothing Phone 2 Pro 完整開箱](https://edwardwu23.com/posts/Stylish-Design-Meets-High-Value-CMF-by-Nothing-Phone-2-Pro-Unboxing/)
+- [Glyph、鏡頭、續航一次看懂：Nothing Phone (3) 深度開箱](https://edwardwu23.com/posts/Nothing-Phone-3-In-Depth-Review-Glyph-Camera-Battery/)
+- [真實長測：Nothing Headphone (1) 降噪、通話、佩戴舒適度全記錄](https://edwardwu23.com/posts/Nothing-Headphone-1-Long-Term-Review/)
+- [Nothing Ear (3) & CMF Headphone Pro 評測：升級重點與差異整理：值得從前代升級嗎？](https://edwardwu23.com/posts/Nothing-Ear-3-and-CMF-Headphone-Pro-Review-and-Comparison/)
+- [Nothing Phone (4a) 系列評測：金屬機身、潛望長焦，重新定義中階旗艦？](https://edwardwu23.com/posts/Nothing-Phone-4a-Series-Review-Glyph-Matrix-Metal-Design-Snapdragon/)
+- [Nothing Headphone (a) 評測：更輕、更久、更平價的耳罩式新選擇](https://edwardwu23.com/posts/Nothing-Headphone-a-Review-ANC-Battery-Life-Design/)
 
 ### <i class="fas fa-laptop"></i> Asus Taiwan / ROG Taiwan
-- [Proxmox 家用伺服器大升級：TUF Gaming B850-Plus WiFi × Ryzen 9 9950X 實戰紀錄](https://bluehomewu.github.io/posts/Proxmox-Home-Server-Upgrade-TUF-Gaming-B850-Plus-Ryzen-9-9950X-Build-Log/)
-- [攜手 Microsoft Copilot+：華碩 Vivobook S15 重新定義生產力](https://bluehomewu.github.io/posts/Microsoft-Copilot-Plus-Asus-Vivobook-S15-Productivity-Review/)
-- [ROG Strix SCAR 18 (2023) G834 開箱評測](https://bluehomewu.github.io/posts/ROG-Strix-Scar-18-2023-G834-Unboxing-Review/)
+- [Proxmox 家用伺服器大升級：TUF Gaming B850-Plus WiFi × Ryzen 9 9950X 實戰紀錄](https://edwardwu23.com/posts/Proxmox-Home-Server-Upgrade-TUF-Gaming-B850-Plus-Ryzen-9-9950X-Build-Log/)
+- [攜手 Microsoft Copilot+：華碩 Vivobook S15 重新定義生產力](https://edwardwu23.com/posts/Microsoft-Copilot-Plus-Asus-Vivobook-S15-Productivity-Review/)
+- [ROG Strix SCAR 18 (2023) G834 開箱評測](https://edwardwu23.com/posts/ROG-Strix-Scar-18-2023-G834-Unboxing-Review/)
 
 ### <i class="fas fa-server"></i> Asustor 華芸
-- [當機架上的伺服器歸於平靜：我從 True-NAS 轉投 Asustor AS6702T v2 的心路歷程](https://bluehomewu.github.io/posts/When-the-Server-Rack-Fell-Silent-My-Journey-from-DIY-TrueNAS-to-Asustor-AS6702T-v2/)
-- [當機架歸於平靜之後：我如何在 Asustor AS6702T v2 上，用 Docker 打造個人應用生態系](https://bluehomewu.github.io/posts/After-the-Rack-Fell-Silent-Building-a-Personal-App-Ecosystem-with-Docker-on-Asustor-AS6702T-v2/)
+- [當機架上的伺服器歸於平靜：我從 True-NAS 轉投 Asustor AS6702T v2 的心路歷程](https://edwardwu23.com/posts/When-the-Server-Rack-Fell-Silent-My-Journey-from-DIY-TrueNAS-to-Asustor-AS6702T-v2/)
+- [當機架歸於平靜之後：我如何在 Asustor AS6702T v2 上，用 Docker 打造個人應用生態系](https://edwardwu23.com/posts/After-the-Rack-Fell-Silent-Building-a-Personal-App-Ecosystem-with-Docker-on-Asustor-AS6702T-v2/)
 
 ### <i class="fab fa-intel"></i> Intel Taiwan
-- [2022 Intel VIP 限定的新產品發布會 會後心得分享](https://bluehomewu.github.io/posts/2022-Intel-VIP-Launch-Event-Recap/)
+- [2022 Intel VIP 限定的新產品發布會 會後心得分享](https://edwardwu23.com/posts/2022-Intel-VIP-Launch-Event-Recap/)
 - [從零開始的 Intel 校園大使探索之旅 Part 1](https://hackmd.io/@EdwardWu/StartFromZeroIntelTW2ndCampusAmbassador)
 
 ### <i class="fas fa-microchip"></i> AMD Taiwan
-- [AMD Ryzen 7 5800X 遲來的「主觀」評測](https://bluehomewu.github.io/posts/AMD-Ryzen-7-5800X-Review/)
+- [AMD Ryzen 7 5800X 遲來的「主觀」評測](https://edwardwu23.com/posts/AMD-Ryzen-7-5800X-Review/)
 
 ### <i class="fas fa-hdd"></i> Fn NAS 飛牛 NAS
-- [當平靜的機架再起漣漪：飛牛 Evo 2 與我的 Asustor AS6702T v2](https://bluehomewu.github.io/posts/Ripples-in-the-Quiet-Rack-Integrating-the-FN-Evo-2-with-Asustor-AS6702T-v2/)
+- [當平靜的機架再起漣漪：飛牛 Evo 2 與我的 Asustor AS6702T v2](https://edwardwu23.com/posts/Ripples-in-the-Quiet-Rack-Integrating-the-FN-Evo-2-with-Asustor-AS6702T-v2/)
 
 ### <i class="fas fa-cloud"></i> Cloud Native Infra Labs
 - [CNTUG Infra Labs 使用心得](https://hackmd.io/@EdwardWu/InfraLabs_OP)
@@ -104,11 +104,11 @@ title: 關於
 
 ## 技術教學文章
 
-- [Android 第三方 ROM 繁體中文編譯教學](https://bluehomewu.github.io/posts/Android-Third-Party-ROM-Traditional-Chinese-Compile-Tutorial/)
-- [Android 第三方 Recovery 繁體中文編譯教學](https://bluehomewu.github.io/posts/Android-Third-Party-Recovery-Traditional-Chinese-Compile-Tutorial/)
-- [SM8550 BSP Compile Guide](https://bluehomewu.github.io/posts/SM8550-BSP-Compile-Guide/)
-- [SM84xx BSP Compile Guide](https://bluehomewu.github.io/posts/SM84xx-BSP-Compile-Guide/)
-- [Pixel Watch 2 Demo 展示機改回正常零售版系統](https://bluehomewu.github.io/posts/Pixel-Watch-2-Convert-Demo-Unit-to-normal-Firmware/)
-- [關閉 / 刪除 Zenfone / ROG Phone 全局顯示 IMEI 浮水印方法筆記](https://bluehomewu.github.io/posts/Disable-ASUS-Phone-IMEI-Watermark/)
-- [繞過 Zenfone / ROG Phone 阻擋跑分軟體方法筆記](https://bluehomewu.github.io/posts/Bypass-ASUS-Phone-BenchmarkBlockerService/)
-- [Nothing Phone (2a) DVT 工程機：恢復基頻 (Baseband) 與 IMEI 紀錄](https://bluehomewu.github.io/posts/Restoring-Baseband-and-IMEI-on-Nothing-Phone-2a-DVT/)
+- [Android 第三方 ROM 繁體中文編譯教學](https://edwardwu23.com/posts/Android-Third-Party-ROM-Traditional-Chinese-Compile-Tutorial/)
+- [Android 第三方 Recovery 繁體中文編譯教學](https://edwardwu23.com/posts/Android-Third-Party-Recovery-Traditional-Chinese-Compile-Tutorial/)
+- [SM8550 BSP Compile Guide](https://edwardwu23.com/posts/SM8550-BSP-Compile-Guide/)
+- [SM84xx BSP Compile Guide](https://edwardwu23.com/posts/SM84xx-BSP-Compile-Guide/)
+- [Pixel Watch 2 Demo 展示機改回正常零售版系統](https://edwardwu23.com/posts/Pixel-Watch-2-Convert-Demo-Unit-to-normal-Firmware/)
+- [關閉 / 刪除 Zenfone / ROG Phone 全局顯示 IMEI 浮水印方法筆記](https://edwardwu23.com/posts/Disable-ASUS-Phone-IMEI-Watermark/)
+- [繞過 Zenfone / ROG Phone 阻擋跑分軟體方法筆記](https://edwardwu23.com/posts/Bypass-ASUS-Phone-BenchmarkBlockerService/)
+- [Nothing Phone (2a) DVT 工程機：恢復基頻 (Baseband) 與 IMEI 紀錄](https://edwardwu23.com/posts/Restoring-Baseband-and-IMEI-on-Nothing-Phone-2a-DVT/)
