@@ -1,0 +1,44 @@
+---
+layout: default
+---
+
+<article class="post-container" id="post-article">
+  <!-- 返回首頁按鈕 -->
+  <a href="{{ site.baseurl }}/" class="back-btn" id="post-back-button">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="19" y1="12" x2="5" y2="12"></line>
+      <polyline points="12 19 5 12 12 5"></polyline>
+    </svg>
+    返回新聞首頁
+  </a>
+
+  <!-- 新聞稿頂部資訊 -->
+  <header class="post-header" id="post-header-section">
+    {% if page.categories %}
+      <div class="post-meta" style="margin-bottom: 0.5rem;">
+        {% for category in page.categories %}
+          <span class="post-tag">{{ category }}</span>
+        {% endfor %}
+      </div>
+    {% endif %}
+    
+    <h1 class="post-title" id="post-main-title">{{ page.title }}</h1>
+    
+    <div class="post-meta-detail" id="post-meta-info">
+      <span class="post-date" id="post-date-display">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+        發佈日期：{{ page.date | date: "%Y 年 %m 月 %d 日" }}
+      </span>
+    </div>
+  </header>
+
+  <!-- 新聞稿內文 -->
+  <div class="post-content" id="post-body-content">
+    {{ content }}
+  </div>
+</article>

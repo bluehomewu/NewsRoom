@@ -1,0 +1,23 @@
+title: "NewsRoom 新聞中心"
+email: "NewsRoom@edwardwu23.com"
+description: "NewsRoom 合作夥伴新聞稿發佈平台"
+baseurl: "/NewsRoom"
+url: "https://edwardwu23.com"
+
+# 完全使用客製化佈局與樣式，不套用 Jekyll 預設主題
+theme: null
+
+# 排除不需要編譯到靜態網站中的檔案與資料夾
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor/bundle/
+  - vendor/cache/
+  - vendor/gems/
+  - vendor/ruby/
+  - .sass-cache
+  - .jekyll-cache
+  - .jekyll-metadata
+  - AGENTS.md
+  - POWER_AUTOMATE_GUIDE.md
+  - README.md

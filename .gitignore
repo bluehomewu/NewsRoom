@@ -2,5 +2,9 @@
 .antigravitycli/
 .claude/
 CLAUDE.md
-AGENTS.md
-POWER_AUTOMATE_GUIDE.md
+
+# Jekyll
+_site/
+.jekyll-cache/
+.sass-cache/
+.jekyll-metadata
