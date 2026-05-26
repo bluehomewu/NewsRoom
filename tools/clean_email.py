@@ -11,6 +11,28 @@ def clean_text_prefix(text):
         return match.group(2).strip()
     return text.strip()
 
+def is_header_field(line):
+    stripped = line.strip()
+    if not stripped:
+        return False
+    
+    # 標準化冒號，將全形冒號替換為半形冒號以利處理
+    normalized = stripped.replace('：', ':')
+    
+    header_fields = ['from:', 'to:', 'subject:', 'date:', 'sent:', 'cc:', '寄件者:', '收件者:', '日期:', '主旨:', '副本:']
+    
+    # 檢查是否以任何 header_fields 開頭
+    if any(normalized.lower().startswith(field) for field in header_fields):
+        return True
+        
+    # 檢查是否包含冒號，且冒號前面的單字屬於 header_fields
+    if ':' in normalized:
+        prefix = normalized.split(':', 1)[0].strip().lower()
+        if any(prefix == f.replace(':', '') for f in header_fields):
+            return True
+            
+    return False
+
 def clean_body(body):
     # 定位常見轉寄分界線
     fwd_patterns = [
@@ -27,29 +49,54 @@ def clean_body(body):
             break
             
     if split_index != -1:
+        # 有分界線，從分界線之後開始清除標頭
         fwd_body = body[split_index:]
         lines = fwd_body.split('\n')
+        has_header = True
+    else:
+        # 沒有分界線，檢查開頭幾行（跳過前置空行）是否含有標頭欄位
+        lines = body.split('\n')
+        has_header = False
+        non_empty_count = 0
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            non_empty_count += 1
+            if is_header_field(line):
+                has_header = True
+                break
+            if non_empty_count >= 5: # 只檢查前 5 個非空行
+                break
+
+    if has_header:
         clean_lines = []
         in_header = True
-        header_fields = ['from:', 'to:', 'subject:', 'date:', 'sent:', 'cc:', '寄件者:', '收件者:', '日期:', '主旨:', '副本:']
+        header_started = False
         for line in lines:
             stripped = line.strip()
             if in_header:
-                # 遇到空行代表轉寄郵件標頭結束，開始進入原始內文
                 if not stripped:
-                    in_header = False
+                    if header_started:
+                        # 已經讀過標頭，遇到空行代表標頭結束
+                        in_header = False
                     continue
-                # 跳過包含郵件標頭欄位的行
-                if any(stripped.lower().startswith(field) for field in header_fields):
+                
+                if is_header_field(line):
+                    header_started = True
                     continue
-                # 跳過冒號前置與常見標頭相符的行
-                if ':' in stripped and any(stripped.split(':', 1)[0].strip().lower() == f.replace(':', '') for f in header_fields):
+                
+                # 如果已經開始標頭，但此行不是標頭欄位（可能是折行或標頭內其他資訊），繼續跳過
+                if header_started:
                     continue
-                # 其他轉寄標頭細節（如過長收件者換行），繼續跳過
-                continue
+                
+                # 如果還沒開始標頭，就遇到了非空行，代表這不是標頭區塊
+                in_header = False
+                clean_lines.append(line)
             else:
                 clean_lines.append(line)
         return '\n'.join(clean_lines).strip()
+    
     return body.strip()
 
 def main():
