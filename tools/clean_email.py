@@ -95,9 +95,15 @@ def clean_body(body):
                 clean_lines.append(line)
             else:
                 clean_lines.append(line)
-        return '\n'.join(clean_lines).strip()
+        result_body = '\n'.join(clean_lines).strip()
+    else:
+        result_body = body.strip()
+        
+    # 移除華碩免責聲明
+    asus_disclaimer_pattern = r'={10,}\s*This email and any attachments to it contain confidential information[\s\S]*?={10,}'
+    result_body = re.sub(asus_disclaimer_pattern, '', result_body)
     
-    return body.strip()
+    return result_body.strip()
 
 def main():
     if len(sys.argv) < 3:
