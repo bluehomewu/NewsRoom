@@ -109,3 +109,28 @@ Jekyll 文章需要特定的 Front Matter（YAML 標頭）才能正常被解析�
    - **內文**：這是一篇透過電子郵件與 GitHub Actions 自動發佈的新聞稿測試內容！
 3. 等待約 2-3 分鐘，檢查 GitHub Actions 中的 `Publish Press Release Email` 工作流，確認執行成功。
 4. 此工作流會自動將該文章 Commit 提交至 `master` 分支，並觸發 `Build and Deploy` 重新部署網站，隨後即可在新聞首頁看到該文章！
+
+---
+
+## 進階：保留粗體樣式與圖片
+
+本專案的 Python 清洗腳本已內建強大的 **HTML-to-Markdown 自動轉換器**。如果您希望在發佈的新聞稿中保留郵件原本的 **粗體（Bold）樣式** 以及 **嵌入圖片（Images）**，請依照以下步驟調整 Power Automate 的工作流設定：
+
+### 1. 修改 Power Automate 資料傳送格式
+1. 在 **步驟 2** 中，您可以選擇 **跳過（刪除）** `HTML 轉文字` 動作。
+2. 在 **步驟 3** (Compose_Markdown_Body) 中，直接將 `Html_to_text` 的輸出替換為郵件的原始 HTML 本文：
+   ```yaml
+   ---
+   layout: post
+   title: "@{triggerBody()?['subject']}"
+   date: @{utcNow('yyyy-MM-dd HH:mm:ss')} +0800
+   categories: press
+   ---
+   @{triggerBody()?['body']}
+   ```
+   *(這會使 Power Automate 直接將郵件的原始 HTML 傳送給 GitHub Actions，由 GitHub 端的 Python 解析器自動轉換成 Markdown 粗體 `**文字**` 與圖片語法)*
+
+### 2. 新聞稿圖片的最佳實踐
+由於靜態網站託管於 GitHub Pages，瀏覽器無法直接載入郵件附件的本地路徑（即 `cid:` 協定的嵌入圖片）。為了讓新聞稿中的圖片能完美顯示，請遵循以下建議：
+- **使用網路圖片**：在撰寫或發送新聞稿郵件時，請直接在郵件中插入「公開的網路圖片 URL」（例如上傳至公司官網或公開圖床的圖片）。轉換為 Markdown 後，圖片會完美呈現於網頁中。
+- **使用雲端儲存**：您也可以在發送前將圖片附件先行上傳至外部雲端儲存空間（如 Imgur、SharePoint 或 OneDrive）並取得公開連結，再將該 URL 插入郵件中發送。

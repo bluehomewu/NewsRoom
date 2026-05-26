@@ -2,6 +2,90 @@ import base64
 import os
 import re
 import sys
+from html.parser import HTMLParser
+
+class HTMLToMarkdown(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.result = []
+        self.state_stack = []
+        
+    def handle_starttag(self, tag, attrs):
+        attrs_dict = dict(attrs)
+        
+        if tag in ('b', 'strong'):
+            self.result.append('**')
+            self.state_stack.append('bold')
+        elif tag in ('i', 'em'):
+            self.result.append('*')
+            self.state_stack.append('italic')
+        elif tag == 'a':
+            href = attrs_dict.get('href', '')
+            self.result.append('[')
+            self.state_stack.append(('link', href))
+        elif tag == 'img':
+            src = attrs_dict.get('src', '')
+            alt = attrs_dict.get('alt', '圖片')
+            self.result.append(f'![{alt}]({src})')
+        elif tag in ('p', 'div'):
+            if self.result and not self.result[-1].endswith('\n'):
+                self.result.append('\n')
+            self.state_stack.append('paragraph')
+        elif tag == 'br':
+            self.result.append('\n')
+        elif tag in ('h1', 'h2', 'h3', 'h4', 'h5', 'h6'):
+            level = int(tag[1])
+            self.result.append('\n' + '#' * level + ' ')
+            self.state_stack.append('heading')
+        else:
+            self.state_stack.append(tag)
+
+    def handle_endtag(self, tag):
+        if not self.state_stack:
+            return
+            
+        state = self.state_stack.pop()
+        
+        if tag in ('b', 'strong'):
+            self.result.append('**')
+        elif tag in ('i', 'em'):
+            self.result.append('*')
+        elif tag == 'a':
+            if isinstance(state, tuple) and state[0] == 'link':
+                href = state[1]
+                self.result.append(f']({href})')
+            else:
+                self.result.append(']')
+        elif tag in ('p', 'div'):
+            self.result.append('\n')
+        elif tag in ('h1', 'h2', 'h3', 'h4', 'h5', 'h6'):
+            self.result.append('\n')
+
+    def handle_data(self, data):
+        if self.state_stack and self.state_stack[-1] in ('script', 'style'):
+            return
+        self.result.append(data)
+
+    def get_markdown(self):
+        text = "".join(self.result)
+        text = re.sub(r'\n\s*\n+', '\n\n', text)
+        return text.strip()
+
+def html_to_markdown(html):
+    # 先做一些預處理，例如移除 head, script, style 區塊以防雜訊
+    html = re.sub(r'<head>[\s\S]*?</head>', '', html, flags=re.IGNORECASE)
+    html = re.sub(r'<script[\s\S]*?</script>', '', html, flags=re.IGNORECASE)
+    html = re.sub(r'<style[\s\S]*?</style>', '', html, flags=re.IGNORECASE)
+    
+    parser = HTMLToMarkdown()
+    parser.feed(html)
+    return parser.get_markdown()
+
+def is_html(text):
+    html_patterns = [
+        r'<p\b', r'<div\b', r'<span\b', r'<strong\b', r'<b\b', r'<a\b', r'<img\b', r'<br\b', r'<html\b'
+    ]
+    return any(re.search(pat, text, re.IGNORECASE) for pat in html_patterns)
 
 def clean_text_prefix(text):
     # 移除常見轉寄前綴（不分大小寫），支援 fwd:, fwd_, 轉寄:, 轉寄_ 等
@@ -74,7 +158,11 @@ def clean_links_only(text):
     return re.sub(link_pattern, repl, text)
 
 def clean_body(body):
-    # 定位常見轉寄分界線
+    # 1. 偵測並轉換 HTML
+    if is_html(body):
+        body = html_to_markdown(body)
+
+    # 2. 定位常見轉寄分界線
     fwd_patterns = [
         r'-+\s*Forwarded\s*message\s*-+',
         r'-+\s*轉寄的郵件\s*-+',
@@ -112,25 +200,17 @@ def clean_body(body):
     if has_header:
         clean_lines = []
         in_header = True
-        header_started = False
         for line in lines:
             stripped = line.strip()
             if in_header:
                 if not stripped:
-                    if header_started:
-                        # 已經讀過標頭，遇到空行代表標頭結束
-                        in_header = False
+                    # 跳過空行，但不結束標頭（因 HTML 標頭常夾雜空行）
                     continue
-                
                 if is_header_field(line):
-                    header_started = True
+                    # 跳過標頭欄位
                     continue
                 
-                # 如果已經開始標頭，但此行不是標頭欄位（可能是折行或標頭內其他資訊），繼續跳過
-                if header_started:
-                    continue
-                
-                # 如果還沒開始標頭，就遇到了非空行，代表這不是標頭區塊
+                # 遇到第一個既非空行也非標頭行的普通行，代表標頭區塊正式結束，開始讀取正文
                 in_header = False
                 clean_lines.append(line)
             else:
