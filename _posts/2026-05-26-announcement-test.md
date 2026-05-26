@@ -3,6 +3,7 @@ layout: post
 title: "系統公告：NewsRoom 入口網站正式上線"
 date: 2026-05-26 13:00:00 +0800
 categories: announcement
+published: false
 ---
 
 NewsRoom 入口網站今天已完成初始化，並順利部署於自訂網域 `https://edwardwu23.com/NewsRoom/`。
