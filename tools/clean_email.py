@@ -33,6 +33,46 @@ def is_header_field(line):
             
     return False
 
+def merge_paragraph_lines(paragraph_text):
+    # 合併普通段落內部的硬換行
+    lines = paragraph_text.split('\n')
+    if len(lines) <= 1:
+        return paragraph_text
+        
+    result = lines[0].strip()
+    for line in lines[1:]:
+        next_line = line.strip()
+        if not next_line:
+            continue
+            
+        # 檢查 result 的最後一個字元與 next_line 的第一個字元
+        last_char = result[-1] if result else ''
+        first_char = next_line[0] if next_line else ''
+        
+        # 判定是否為英數字或常見英文符號
+        is_last_eng = last_char.isalnum() or last_char in "-_°®™©$#+/"
+        is_first_eng = first_char.isalnum() or first_char in "-_°®™©$#+/"
+        
+        if is_last_eng and is_first_eng:
+            result += " " + next_line
+        else:
+            result += next_line
+            
+    return result
+
+def clean_links_only(text):
+    # 將商品名 [URL] 格式的超連結轉為 [商品名](URL)
+    # 限制商品名稱僅為英數字、空格、連接號等，排除中文字以防連帶匹配 "與" 等連接詞
+    link_pattern = r'([A-Za-z0-9\s\-\_°®™©\.\+]+?)\n*\s*\[(https?://[A-Za-z0-9\.\/\-\_\?\&\=\%\#\:\+]+)\]'
+    
+    def repl(match):
+        name = match.group(1).strip()
+        url = match.group(2).strip()
+        clean_name = merge_paragraph_lines(name)
+        return f"[{clean_name}]({url})"
+        
+    return re.sub(link_pattern, repl, text)
+
 def clean_body(body):
     # 定位常見轉寄分界線
     fwd_patterns = [
@@ -98,6 +138,45 @@ def clean_body(body):
         result_body = '\n'.join(clean_lines).strip()
     else:
         result_body = body.strip()
+        
+    # 段落重新拼裝與超連結格式化
+    # 將內文以空行拆分成多個段落
+    paragraphs = re.split(r'(\n\s*\n+)', result_body)
+    cleaned_paragraphs = []
+    
+    for part in paragraphs:
+        if not part.strip():
+            cleaned_paragraphs.append(part)
+            continue
+            
+        # 檢查該段落是否為 Markdown 特殊格式（列表、標題、表格等）或 PR 聯繫人
+        lines = part.split('\n')
+        is_markdown_special = False
+        
+        for line in lines:
+            stripped_line = line.strip()
+            # 偵測 Markdown 清單、標題、表格、引用等，以及有序清單
+            if stripped_line.startswith(('#', '-', '*', '+', '>', '|')) or re.match(r'^\d+\.(?!\d)', stripped_line):
+                is_markdown_special = True
+                break
+                
+        if "ASUS PR Contacts" in part or "媒體公關" in part or "技術公關" in part:
+            is_markdown_special = True
+            
+        if any(re.match(r'^[\-\=\_]{10,}$', line.strip()) for line in lines):
+            is_markdown_special = True
+            
+        if is_markdown_special:
+            # 特殊段落不合併硬換行，只優化可能存在的超連結
+            cleaned_part = clean_links_only(part)
+            cleaned_paragraphs.append(cleaned_part)
+        else:
+            # 普通內文段落，合併硬換行並優化超連結
+            merged_text = merge_paragraph_lines(part)
+            cleaned_part = clean_links_only(merged_text)
+            cleaned_paragraphs.append(cleaned_part)
+            
+    result_body = "".join(cleaned_paragraphs).strip()
         
     # 移除華碩免責聲明
     asus_disclaimer_pattern = r'={10,}\s*This email and any attachments to it contain confidential information[\s\S]*?={10,}'
