@@ -178,11 +178,21 @@ def clean_body(body):
             
     result_body = "".join(cleaned_paragraphs).strip()
         
-    # 移除華碩免責聲明
-    asus_disclaimer_pattern = r'={10,}\s*This email and any attachments to it contain confidential information[\s\S]*?={10,}'
-    result_body = re.sub(asus_disclaimer_pattern, '', result_body)
-    
-    return result_body.strip()
+    # 移除 PR Contacts 聯絡資訊、長分隔線與免責聲明等尾部雜訊
+    # 1. 依長減號橫線截斷 (10個以上)
+    result_body = re.split(r'\n\s*-{10,}\s*\n', result_body)[0]
+    # 2. 依長等號橫線截斷 (10個以上)
+    result_body = re.split(r'\n\s*={10,}\s*\n', result_body)[0]
+    # 3. 依 PR Contacts 或 媒體/技術公關 關鍵字整行及之後截斷
+    lines = result_body.split('\n')
+    clean_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if "ASUS PR Contacts" in stripped or "PR Contacts" in stripped or stripped.startswith("媒體公關") or stripped.startswith("技術公關"):
+            break
+        clean_lines.append(line)
+        
+    return '\n'.join(clean_lines).strip()
 
 def main():
     if len(sys.argv) < 3:
