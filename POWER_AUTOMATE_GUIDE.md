@@ -130,7 +130,51 @@ Jekyll 文章需要特定的 Front Matter（YAML 標頭）才能正常被解析�
    ```
    *(這會使 Power Automate 直接將郵件的原始 HTML 傳送給 GitHub Actions，由 GitHub 端的 Python 解析器自動轉換成 Markdown 粗體 `**文字**` 與圖片語法)*
 
-### 2. 新聞稿圖片的最佳實踐
-由於靜態網站託管於 GitHub Pages，瀏覽器無法直接載入郵件附件的本地路徑（即 `cid:` 協定的嵌入圖片）。為了讓新聞稿中的圖片能完美顯示，請遵循以下建議：
-- **使用網路圖片**：在撰寫或發送新聞稿郵件時，請直接在郵件中插入「公開的網路圖片 URL」（例如上傳至公司官網或公開圖床的圖片）。轉換為 Markdown 後，圖片會完美呈現於網頁中。
-- **使用雲端儲存**：您也可以在發送前將圖片附件先行上傳至外部雲端儲存空間（如 Imgur、SharePoint 或 OneDrive）並取得公開連結，再將該 URL 插入郵件中發送。
+### 2. 圖片自動化上傳設定步驟（將 GitHub 儲存庫當成圖床）
+若要完全自動化處理郵件中的圖片附件，我們需要將圖片以 Base64 格式打包成陣列，隨同 HTTP 請求傳送給 GitHub Actions：
+
+1. **調整步驟 1 觸發器**：
+   - 點開 `Office 365 Outlook - 當新電子郵件抵達時 (V3)` 動作。
+   - 點選右上角「顯示進階選項」。
+   - 將 **「包含附件」** (Include Attachments) 設定為 **「是」** (Yes)。
+
+2. **新增動作：初始化附件陣列變數**：
+   - 新增動作 `變數 - 初始化變數` (Initialize variable)。
+   - **名稱**：`ImageAttachments`
+   - **類型**：`陣列` (Array)
+   - **值**：保持空白。
+
+3. **新增動作：遍歷附件並過濾圖片**：
+   - 在 `Compose_Markdown_Body` 步驟之前，新增動作 `控制 - Apply to each` (套用到每個)。
+   - **選取前一個步驟的輸出** (Select an output from previous steps)：選擇動態內容中的 **「附件」** (Attachments) 陣列。
+   - **在迴圈中新增一個「條件」** (Condition) 動作：
+     - 設定條件為：`附件內容類型` (Attachment Content-Type) **包含** `image/`。
+     - *(說明：這會過濾出所有的圖片附件，排除非圖片檔案)*
+   - **如果為是** (If yes) 的區塊中，新增動作 `變數 - 附加至陣列變數` (Append to array variable)：
+     - **名稱**：選擇 `ImageAttachments`。
+     - **值** (Value)：輸入以下 JSON：
+       ```json
+       {
+         "filename": "@{items('Apply_to_each')?['name']}",
+         "contentBytes": "@{items('Apply_to_each')?['contentBytes']}",
+         "contentType": "@{items('Apply_to_each')?['contentType']}",
+         "contentId": "@{items('Apply_to_each')?['contentId']}"
+       }
+       ```
+       *(注意：若介面為新版設計，可以直接在動態內容中選擇對應的「附件名稱」、「附件內容」、「附件內容類型」與「附件內容識別碼」)*
+
+4. **更新步驟 4：HTTP 請求 Body**：
+   - 修改最後 HTTP 動作的 **Body** 內容，將打包好的圖片陣列傳入 `attachments` 欄位：
+     ```json
+     {
+       "event_type": "new_press_release",
+       "client_payload": {
+         "filename": "@{variables('FileName')}",
+         "content": "@{base64(outputs('Compose_Markdown_Body'))}",
+         "attachments": @{variables('ImageAttachments')}
+       }
+     }
+     ```
+     *(注意：這裡的 `@{variables('ImageAttachments')}` 無需加雙引號，Power Automate 會自動將陣列變數序列化為 JSON 陣列帶入)*
+
+這樣一來，GitHub 端的 Python 清理腳本就會自動在 `assets/img/posts/` 底下建立該文章的專屬目錄，將圖片解碼儲存，並自動將內文中的 `cid:` 連結改寫為相對於 Jekyll 網站的圖片路徑！您完全不需要手動上傳圖片到任何外部圖床。

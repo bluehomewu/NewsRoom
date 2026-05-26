@@ -1,4 +1,5 @@
 import base64
+import json
 import os
 import re
 import sys
@@ -278,22 +279,87 @@ def clean_body(body):
         
     return '\n'.join(clean_lines).strip()
 
-def main():
-    if len(sys.argv) < 3:
-        print("Usage: python clean_email.py <filename> <base64_content>")
-        sys.exit(1)
-        
-    raw_filename = sys.argv[1].strip()
-    b64_content = sys.argv[2].strip()
+def replace_cid_images(text, attachments, post_base_name):
+    # 尋找所有 cid: 連結，格式通常是 ![alt](cid:xxx) 或 [alt](cid:xxx)
+    # 我們用正則表達式找出 cid: 後面直到 ) 或 空格 的字串
+    cid_pattern = r'cid:([^\)\s]+)'
     
-    # 支援手動觸發 (workflow_dispatch) 時提供預設測試參數，防範 IsADirectoryError 空檔名錯誤
-    if not raw_filename:
-        import datetime
-        today = datetime.datetime.now().strftime('%Y-%m-%d')
-        raw_filename = f"{today}-manual-trigger-test.md"
+    def repl(match):
+        cid_value = match.group(1).strip()
+        # 去除可能存在的角括號
+        cid_value_clean = cid_value.strip('<>')
         
-    if not b64_content:
-        default_post = """---
+        # 尋找匹配的附件
+        matched_attachment = None
+        for att in attachments:
+            att_name = att.get('filename', '').strip()
+            att_cid = att.get('contentId', '')
+            if att_cid:
+                att_cid = att_cid.strip('<>')
+            
+            # 1. 精確匹配 contentId
+            if att_cid and att_cid.lower() == cid_value_clean.lower():
+                matched_attachment = att
+                break
+                
+            # 2. 附件檔名在 cid 之中 (例如 cid: image001.png@01DBC1FA)
+            if att_name and att_name.lower() in cid_value_clean.lower():
+                matched_attachment = att
+                break
+                
+            # 3. cid 在附件檔名之中 (例如 cid: image001.png 去匹配 image001.png)
+            if att_name and cid_value_clean.lower() in att_name.lower():
+                matched_attachment = att
+                break
+                
+            # 4. 去除副檔名後的檔名匹配 (例如 cid: image001 去匹配 image001.png)
+            att_name_no_ext = os.path.splitext(att_name)[0]
+            cid_value_no_ext = os.path.splitext(cid_value_clean)[0]
+            if att_name_no_ext and att_name_no_ext.lower() == cid_value_no_ext.lower():
+                matched_attachment = att
+                break
+                
+        if matched_attachment:
+            att_name = matched_attachment.get('filename')
+            # 替換為 Jekyll 的相對路徑，使用 url 解碼以防路徑在 Jekyll 部署時解析錯誤
+            # 這邊直接輸出為 site.baseurl 的相對路徑
+            return f"{{{{ site.baseurl }}}}/assets/img/posts/{post_base_name}/{att_name}"
+        else:
+            print(f"Warning: Could not find matching attachment for CID: {cid_value}")
+            return match.group(0) # 保持原樣
+            
+    return re.sub(cid_pattern, repl, text)
+
+def main():
+    raw_filename = ""
+    b64_content = ""
+    attachments = []
+    
+    # 優先從環境變數 PAYLOAD_JSON 讀取
+    payload_json = os.environ.get('PAYLOAD_JSON')
+    if payload_json:
+        try:
+            payload = json.loads(payload_json)
+            raw_filename = payload.get('filename', '').strip()
+            b64_content = payload.get('content', '').strip()
+            attachments = payload.get('attachments', [])
+            print("Successfully loaded payload from PAYLOAD_JSON environment variable.")
+        except Exception as e:
+            print(f"Error parsing PAYLOAD_JSON: {e}")
+            sys.exit(1)
+            
+    # 若環境變數不存在，退回使用命令列參數（以相容本地測試與手動觸發）
+    if not raw_filename and not b64_content:
+        if len(sys.argv) >= 3:
+            raw_filename = sys.argv[1].strip()
+            b64_content = sys.argv[2].strip()
+            print("Loaded payload from command line arguments.")
+        else:
+            # 支援手動觸發 (workflow_dispatch) 時提供預設測試參數，防範 IsADirectoryError 空檔名錯誤
+            import datetime
+            today = datetime.datetime.now().strftime('%Y-%m-%d')
+            raw_filename = f"{today}-manual-trigger-test.md"
+            default_post = """---
 layout: post
 title: "手動測試：自動發佈工作流驗證"
 date: 2026-05-26 12:00:00 +0800
@@ -304,11 +370,10 @@ categories: test
 
 如果您能在新聞首頁看到此文章，代表郵件發文與網站部署工作流皆正常運行！
 """
-        b64_content = base64.b64encode(default_post.encode('utf-8')).decode('utf-8')
+            b64_content = base64.b64encode(default_post.encode('utf-8')).decode('utf-8')
+            print("Using default manual trigger test payload.")
 
-    
     # 1. 清洗檔名
-    # 檔名格式通常為 YYYY-MM-DD-filename.md
     filename_match = re.match(r'^(\d{4}-\d{2}-\d{2}-)(.+)$', raw_filename)
     if filename_match:
         date_prefix = filename_match.group(1)
@@ -356,11 +421,56 @@ categories: test
         clean_front_matter = '\n'.join(clean_fm_lines)
         clean_body_text = clean_body(body)
         
+        # 4. 處理與儲存圖片附件
+        valid_attachments = []
+        post_base_name = os.path.splitext(clean_filename)[0]
+        
+        if attachments:
+            img_dir = os.path.join('assets', 'img', 'posts', post_base_name)
+            os.makedirs(img_dir, exist_ok=True)
+            
+            for att in attachments:
+                name = att.get('filename', '').strip()
+                content_bytes = att.get('contentBytes', '')
+                content_type = att.get('contentType', '')
+                
+                if not name or not content_bytes:
+                    continue
+                    
+                # 判定是否為圖片
+                is_image = False
+                if content_type and content_type.lower().startswith('image/'):
+                    is_image = True
+                else:
+                    _, ext = os.path.splitext(name.lower())
+                    if ext in ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'):
+                        is_image = True
+                        
+                if is_image:
+                    try:
+                        # 將空白與冒號替換為安全字元，以免造成路徑問題
+                        safe_name = name.replace(':', '_').replace(' ', '_')
+                        # 更新附件檔名為 safe_name，供之後 replace_cid_images 使用
+                        att['filename'] = safe_name
+                        
+                        img_data = base64.b64decode(content_bytes)
+                        img_path = os.path.join(img_dir, safe_name)
+                        with open(img_path, 'wb') as img_f:
+                            img_f.write(img_data)
+                        print(f"Successfully saved image attachment: {img_path}")
+                        valid_attachments.append(att)
+                    except Exception as e:
+                        print(f"Error saving attachment {name}: {e}")
+                        
+        # 5. 改寫正文中的 cid: 圖片連結
+        if valid_attachments:
+            clean_body_text = replace_cid_images(clean_body_text, valid_attachments, post_base_name)
+            
         final_content = f"---\n{clean_front_matter}---\n\n{clean_body_text}"
     else:
         final_content = raw_content
         
-    # 4. 寫入檔案
+    # 6. 寫入檔案
     os.makedirs('_posts', exist_ok=True)
     dest_path = os.path.join('_posts', clean_filename)
     
@@ -369,7 +479,7 @@ categories: test
         
     print(f"Successfully processed and saved to: {dest_path}")
     
-    # 5. 將新檔名寫入 GitHub Actions 輸出
+    # 7. 將新檔名寫入 GitHub Actions 輸出
     github_output = os.environ.get('GITHUB_OUTPUT')
     if github_output:
         with open(github_output, 'a', encoding='utf-8') as go:
