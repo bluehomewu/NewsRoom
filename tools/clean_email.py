@@ -29,8 +29,14 @@ class HTMLToMarkdown(HTMLParser):
             alt = attrs_dict.get('alt', '圖片')
             self.result.append(f'![{alt}]({src})')
         elif tag in ('p', 'div'):
-            if self.result and not self.result[-1].endswith('\n'):
-                self.result.append('\n')
+            # 確保段落開始前有至少一個空行 (兩個換行)
+            if self.result:
+                last_content = "".join(self.result[-2:])
+                if not last_content.endswith('\n\n'):
+                    if last_content.endswith('\n'):
+                        self.result.append('\n')
+                    else:
+                        self.result.append('\n\n')
             self.state_stack.append('paragraph')
         elif tag == 'br':
             self.result.append('\n')
@@ -58,7 +64,7 @@ class HTMLToMarkdown(HTMLParser):
             else:
                 self.result.append(']')
         elif tag in ('p', 'div'):
-            self.result.append('\n')
+            self.result.append('\n\n')
         elif tag in ('h1', 'h2', 'h3', 'h4', 'h5', 'h6'):
             self.result.append('\n')
 
@@ -349,6 +355,7 @@ def main():
     raw_filename = ""
     b64_content = ""
     attachments = []
+    payload = {}
     
     # 優先從環境變數 PAYLOAD_JSON 讀取
     payload_json = os.environ.get('PAYLOAD_JSON')
@@ -497,9 +504,24 @@ categories: test
                     except Exception as e:
                         print(f"Error processing attachment {name}: {e}")
                         
-        # 5. 改寫正文中的 cid: 圖片連結
+        # 5. 改寫正文中的 cid: 圖片連結，並收集未在正文中引用的圖片
+        referenced_images = []
         if valid_attachments:
             clean_body_text = replace_cid_images(clean_body_text, valid_attachments, post_base_name)
+            
+            # 檢查哪些 valid_attachments 檔案沒有被 html 的 img 標籤引用
+            # （意即它們的檔名沒有出現在已重寫完的 clean_body_text 中）
+            for att in valid_attachments:
+                att_name = att.get('filename')
+                if att_name and att_name not in clean_body_text:
+                    referenced_images.append(att)
+                    
+        # 若有未被正文引用的圖片附件（例如信件直接以附件發送而 HTML 中無 img 元素），則自動追加到文章尾端
+        if referenced_images:
+            clean_body_text += "\n\n---\n\n### 相關圖片\n\n"
+            for att in referenced_images:
+                att_name = att.get('filename')
+                clean_body_text += f"![{att_name}]({{{{ site.baseurl }}}}/assets/img/posts/{post_base_name}/{att_name})\n\n"
             
         final_content = f"---\n{clean_front_matter}---\n\n{clean_body_text}"
     else:
