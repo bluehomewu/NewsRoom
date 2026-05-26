@@ -30,7 +30,6 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git pull origin master --rebase
           git add _posts/
           git add assets/img/posts/ 2>/dev/null || true
           # 嚴格遵循 -s 簽署規範，且不加任何 AI 聯名署名
@@ -38,4 +37,5 @@ jobs:
 
           Filename: ${{ steps.clean_step.outputs.clean_filename }}
           Triggered by Repository Dispatch event."
+          git pull origin master --rebase
           git push origin master
