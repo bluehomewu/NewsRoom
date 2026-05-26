@@ -19,18 +19,19 @@ jobs:
       - name: Create Posts Directory
         run: mkdir -p _posts
 
-      - name: Decode and Save Content
+      - name: Decode, Clean and Save Content
+        id: clean_step
         run: |
-          echo "${{ github.event.client_payload.content }}" | base64 --decode > _posts/${{ github.event.client_payload.filename }}
+          python tools/clean_email.py "${{ github.event.client_payload.filename }}" "${{ github.event.client_payload.content }}"
 
       - name: Commit and Push Changes
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add _posts/${{ github.event.client_payload.filename }}
+          git add _posts/${{ steps.clean_step.outputs.clean_filename }}
           # 嚴格遵循 -s 簽署規範，且不加任何 AI 聯名署名
           git commit -s -m "chore(posts): publish new press release via email dispatch
 
-          Filename: ${{ github.event.client_payload.filename }}
+          Filename: ${{ steps.clean_step.outputs.clean_filename }}
           Triggered by Repository Dispatch event."
           git push origin master
