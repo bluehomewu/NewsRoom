@@ -347,7 +347,7 @@ def replace_cid_images(text, attachments, post_base_name):
         if matched_attachment:
             # 替換為重新命名後的安全檔名 filename (例如 image_1.jpg)
             safe_name = matched_attachment.get('filename')
-            return f"{{{{ site.baseurl }}}}/assets/img/posts/{post_base_name}/{safe_name}"
+            return f"/assets/img/posts/{post_base_name}/{safe_name}"
         else:
             print(f"Warning: Could not find matching attachment for CID: {cid_value}")
             return match.group(0) # 保持原樣
@@ -542,7 +542,7 @@ categories: test
                 if len(alt_text) > 30:
                     alt_text = alt_text[:30] + "..."
                     
-                clean_body_text += f"![{alt_text}]({{{{ site.baseurl }}}}/assets/img/posts/{post_base_name}/{safe_name})\n\n"
+                clean_body_text += f"![{alt_text}](/assets/img/posts/{post_base_name}/{safe_name})\n\n"
             
         final_content = f"---\n{clean_front_matter}---\n\n{clean_body_text}"
     else:
