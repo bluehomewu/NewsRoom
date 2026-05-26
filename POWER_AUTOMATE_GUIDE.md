@@ -130,9 +130,11 @@ Jekyll 文章需要特定的 Front Matter（YAML 標頭）才能正常被解析�
    ```
    *(這會使 Power Automate 直接將郵件的原始 HTML 傳送給 GitHub Actions，由 GitHub 端的 Python 解析器自動轉換成 Markdown 粗體 `**文字**` 與圖片語法)*
 
-### 2. 免費版圖片自動化發佈設定步驟（使用 OneDrive + GitHub 共同完成）
+### 2. 圖片自動化發佈設定步驟（直接傳送附件 Base64 內容）
 
-如果您在 Power Automate 中直接使用「HTTP」動作上傳圖片，會因為該動作屬於進階 (Premium) 功能而收到授權警告。為此，我們可以利用完全免費的 **OneDrive** (Standard 動作) 來暫存郵件中的圖片附件並產生分享連結，再由 GitHub Actions 自動下載圖片並發佈，如此一來既能免去 Premium 收費，又不會受到 GitHub 64 KB Payload 大小限制的干擾！
+> **原理說明**：Power Automate 的郵件觸發器會自動將附件以 Base64 格式提供（`contentBytes`）。我們只需要將這些 Base64 資料打包進 GitHub Repository Dispatch 的 `client_payload` 中，由 GitHub Actions 端的 Python 腳本自動解碼並儲存為圖片檔案。
+>
+> **⚠️ 注意：不要使用 OneDrive 分享連結方式！** OneDrive 的 `webUrl` 分享連結在伺服器端無法直接下載（會收到 HTML 登入頁面而非圖片），因此本流程直接傳送附件內容。
 
 #### 1. 調整步驟 1 觸發器
 - 點開 `當新電子郵件抵達時 (V3)` 動作。
@@ -142,14 +144,14 @@ Jekyll 文章需要特定的 Front Matter（YAML 標頭）才能正常被解析�
 
 #### 2. 初始化兩個關鍵變數
 在觸發器下方，點選 **「+ 新增步驟」**，搜尋 `變數`，並加入兩個 **「初始化變數」** 動作：
-- **變數一：PostBaseName** (字串變數)：用來作為圖片在 OneDrive 與 GitHub 中的資料夾名稱。
+- **變數一：PostBaseName** (字串變數)：用來作為圖片在 GitHub 中的資料夾名稱。
   - **名稱**：`PostBaseName`
   - **類型**：`字串`
   - **值**（點選右側「運算式 Expression」輸入，然後按確定）：
     ```text
     concat(utcNow('yyyy-MM-dd'), '-', replace(replace(triggerBody()?['subject'], ' ', '_'), ':', '_'))
     ```
-- **變數二：ImageAttachments** (陣列變數)：用來收集圖片資訊。
+- **變數二：ImageAttachments** (陣列變數)：用來收集圖片附件資訊。
   - **名稱**：`ImageAttachments`
   - **類型**：`陣列`
   - **值**：保持空白，什麼都不用填。
@@ -162,50 +164,37 @@ Jekyll 文章需要特定的 Front Matter（YAML 標頭）才能正常被解析�
   - **中間選單**：選擇 **「包含」** (contains)。
   - **右邊第三個格子**：手動輸入文字 **`image/`**。
 
-#### 4. 在「如果是」 (If yes) 綠色區塊中新增三個動作
-點開條件下方 **「如果是」** 的綠色區塊，在內部依序新增以下三個動作：
+#### 4. 在「如果是」 (If yes) 綠色區塊中新增動作
+點開條件下方 **「如果是」** 的綠色區塊，在內部新增以下動作：
 
-- **動作 A：OneDrive - 建立檔案**：
-  - 搜尋 **`OneDrive`**，選擇 **「建立檔案」** (Create file) 動作。
-  - **資料夾路徑**：輸入 `/NewsRoom/attachments/@{variables('PostBaseName')}`
-  - **檔案名稱**：點選動態內容中的 **「附件名稱」** (即 `@{item()?['name']}`)
-  - **檔案內容**：點選動態內容中的 **「附件內容」** (即 `@{item()?['contentBytes']}`)
-
-- **動作 B：OneDrive - 建立共用連結 (V2)**：
-  - 搜尋 **`OneDrive`**，選擇 **「建立共用連結 (V2)」** (Create share link (V2))。
-  - **檔案**：點選輸入框，在動態內容中尋找上一個動作「建立檔案」產生的 **「識別碼」** (Id)。
-  - **連結類型**：下拉選擇 **「僅限檢視」** (View)。
-  - **連結範圍**：下拉選擇 **「任何人」** (Anonymous) *(注意：必須是任何人，GitHub 才能免登入下載)*。
-
-- **動作 C：變數 - 附加至陣列變數**：
+- **動作：變數 - 附加至陣列變數**：
   - 搜尋 **`變數`**，選擇 **「附加至陣列變數」**。
   - **名稱**：選擇 **`ImageAttachments`**。
-  - **值**：複製貼上以下 JSON（將內容轉為 OneDrive 下載連結，實現 Payload 瘦身）：
+  - **值**：複製貼上以下 JSON：
     ```json
     {
       "filename": "@{item()?['name']}",
       "contentId": "@{item()?['contentId']}",
-      "shareLink": "@{outputs('建立共用連結_(V2)')?['body/link/webUrl']}"
+      "contentBytes": "@{item()?['contentBytes']}"
     }
     ```
-    *(注意：若您的 OneDrive 動作名稱有調整，請點選動態內容中的「網頁 URL / WebUrl」標籤代替上面 JSON 中的 shareLink 運算式)*
+
+> **⚡ 與之前的差異**：不再需要 OneDrive「建立檔案」和「建立共用連結」動作！直接將 `contentBytes`（附件的 Base64 編碼內容）放入陣列中即可。如果您的流程中有 OneDrive 相關動作，可以安全地刪除它們。
 
 #### 5. 更新最後的「建立存放庫分派事件」
 1. 找到最下方的 **「建立存放庫分派事件」** 動作展開。
-2. 將 Body (或 client_payload) 修改為以下內容：
+2. 將事件裝載 (client_payload) 修改為以下內容：
    ```json
    {
-     "event_type": "new_press_release",
-     "client_payload": {
-       "filename": "@{variables('FileName')}",
-       "content": "@{base64(outputs('Compose_Markdown_Body'))}",
-       "post_base_name": "@{variables('PostBaseName')}",
-       "attachments": 
-     }
+     "filename": "@{variables('FileName')}",
+     "content": "@{base64(outputs('Compose_Markdown_Body'))}",
+     "post_base_name": "@{variables('PostBaseName')}",
+     "attachments": @{variables('ImageAttachments')}
    }
    ```
-   *(在 `"attachments":` 的冒號後面，不要加雙引號，直接點選動態內容中的 **`ImageAttachments`** 陣列變數)*
+   *(在 `"attachments":` 的值，直接使用動態內容中的 **`ImageAttachments`** 陣列變數，不要加雙引號)*
 
 ---
 
-這樣一來，圖片會先被存放在您的個人 OneDrive 中並產生公開下載網址，GitHub Actions 收到 Dispatch 事件後，Python 腳本會自動讀取網址將圖片下載並存入儲存庫中的 `assets/img/posts/` 底下，最後一併完成網站部署！這完全不需要任何付費授權，非常安全且全自動。
+> **💡 大小限制說明**：GitHub Repository Dispatch 的 Payload 上限為 **25 MB**。一般新聞稿附件的圖片（經過郵件壓縮後通常每張 100KB-2MB）完全在此限制範圍內。若單封郵件的圖片附件總量超過 25 MB，建議將部分大圖改為外部連結。
+

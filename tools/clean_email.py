@@ -285,20 +285,25 @@ def clean_body(body):
         
     return '\n'.join(clean_lines).strip()
 
-def download_image_from_link(url, save_path):
-    import urllib.request
-    download_url = url
-    # 針對 OneDrive 共用連結進行直接下載網址的轉換
-    if "onedrive.live.com" in url or "1drv.ms" in url:
-        if "?" in url:
-            download_url += "&download=1"
-        else:
-            download_url += "?download=1"
-            
-    print(f"Downloading from converted URL: {download_url}")
-    req = urllib.request.Request(download_url, headers={'User-Agent': 'Mozilla/5.0'})
-    with urllib.request.urlopen(req) as response, open(save_path, 'wb') as out_file:
-        out_file.write(response.read())
+def is_valid_image_data(data):
+    """檢查二進位資料是否為有效的圖片格式（而非 HTML 頁面等錯誤內容）"""
+    # 常見圖片格式的 magic bytes
+    image_signatures = [
+        b'\xff\xd8\xff',       # JPEG
+        b'\x89PNG\r\n\x1a\n',  # PNG
+        b'GIF87a', b'GIF89a',  # GIF
+        b'RIFF',               # WebP (RIFF....WEBP)
+        b'BM',                 # BMP
+        b'<svg',               # SVG (XML-based)
+    ]
+    for sig in image_signatures:
+        if data[:len(sig)] == sig:
+            return True
+    # WebP 進一步確認
+    if data[:4] == b'RIFF' and len(data) > 11 and data[8:12] == b'WEBP':
+        return True
+    return False
+
 
 def replace_cid_images(text, attachments, post_base_name):
     # 尋找所有 cid: 連結，格式通常是 ![alt](cid:xxx) 或 [alt](cid:xxx)
@@ -452,6 +457,12 @@ categories: test
         if not post_base_name:
             post_base_name = os.path.splitext(clean_filename)[0]
             
+        # 清洗 post_base_name：移除 Fwd 前綴（使其與 clean_filename 一致）
+        pbn_match = re.match(r'^(\d{4}-\d{2}-\d{2}-)(.+)$', post_base_name)
+        if pbn_match:
+            pbn_rest = clean_text_prefix(pbn_match.group(2))
+            post_base_name = f"{pbn_match.group(1)}{pbn_rest}"
+            
         # 將 post_base_name 中的空白與冒號替換為安全字元
         post_base_name = post_base_name.replace(':', '_').replace(' ', '_')
         
@@ -462,7 +473,6 @@ categories: test
             for att in attachments:
                 name = att.get('filename', '').strip()
                 content_bytes = att.get('contentBytes', '')
-                share_link = att.get('shareLink') or att.get('share_link', '')
                 content_type = att.get('contentType', '')
                 
                 if not name:
@@ -494,25 +504,23 @@ categories: test
                         att['filename'] = safe_name
                         img_path = os.path.join(img_dir, safe_name)
                         
-                        # 優先級 1: 檔案內容 contentBytes 存在時直接在本機解碼儲存
+                        # 從 contentBytes (Base64) 解碼並儲存圖片
                         if content_bytes:
                             os.makedirs(img_dir, exist_ok=True)
                             img_data = base64.b64decode(content_bytes)
+                            
+                            # 驗證解碼後的資料確實是圖片，而非 HTML 頁面等錯誤內容
+                            if not is_valid_image_data(img_data):
+                                print(f"WARNING: Decoded data for {name} is NOT a valid image (possibly HTML). Skipping.")
+                                print(f"  First 100 bytes: {img_data[:100]}")
+                                continue
+                                
                             with open(img_path, 'wb') as img_f:
                                 img_f.write(img_data)
-                            print(f"Successfully saved image attachment from bytes: {img_path}")
-                            valid_attachments.append(att)
-                            
-                        # 優先級 2: 分享連結 shareLink 存在時由 Actions 主動下載 (免 Premium 方案)
-                        elif share_link:
-                            os.makedirs(img_dir, exist_ok=True)
-                            print(f"Downloading image from shareLink: {share_link}")
-                            download_image_from_link(share_link, img_path)
-                            print(f"Successfully downloaded and saved image to: {img_path}")
+                            print(f"Successfully saved image ({len(img_data)} bytes): {img_path}")
                             valid_attachments.append(att)
                         else:
-                            print(f"Image metadata registered for cid rewriting: {safe_name}")
-                            valid_attachments.append(att)
+                            print(f"WARNING: No contentBytes for attachment {name}. Skipping image save.")
                             
                     except Exception as e:
                         print(f"Error processing attachment {name}: {e}")
