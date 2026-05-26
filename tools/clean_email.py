@@ -279,6 +279,21 @@ def clean_body(body):
         
     return '\n'.join(clean_lines).strip()
 
+def download_image_from_link(url, save_path):
+    import urllib.request
+    download_url = url
+    # 針對 OneDrive 共用連結進行直接下載網址的轉換
+    if "onedrive.live.com" in url or "1drv.ms" in url:
+        if "?" in url:
+            download_url += "&download=1"
+        else:
+            download_url += "?download=1"
+            
+    print(f"Downloading from converted URL: {download_url}")
+    req = urllib.request.Request(download_url, headers={'User-Agent': 'Mozilla/5.0'})
+    with urllib.request.urlopen(req) as response, open(save_path, 'wb') as out_file:
+        out_file.write(response.read())
+
 def replace_cid_images(text, attachments, post_base_name):
     # 尋找所有 cid: 連結，格式通常是 ![alt](cid:xxx) 或 [alt](cid:xxx)
     # 我們用正則表達式找出 cid: 後面直到 ) 或 空格 的字串
@@ -423,18 +438,23 @@ categories: test
         
         # 4. 處理與儲存圖片附件
         valid_attachments = []
-        post_base_name = os.path.splitext(clean_filename)[0]
+        post_base_name = payload.get('post_base_name', '').strip()
+        if not post_base_name:
+            post_base_name = os.path.splitext(clean_filename)[0]
+            
+        # 將 post_base_name 中的空白與冒號替換為安全字元
+        post_base_name = post_base_name.replace(':', '_').replace(' ', '_')
         
         if attachments:
             img_dir = os.path.join('assets', 'img', 'posts', post_base_name)
-            os.makedirs(img_dir, exist_ok=True)
             
             for att in attachments:
                 name = att.get('filename', '').strip()
                 content_bytes = att.get('contentBytes', '')
+                share_link = att.get('shareLink') or att.get('share_link', '')
                 content_type = att.get('contentType', '')
                 
-                if not name or not content_bytes:
+                if not name:
                     continue
                     
                 # 判定是否為圖片
@@ -452,15 +472,30 @@ categories: test
                         safe_name = name.replace(':', '_').replace(' ', '_')
                         # 更新附件檔名為 safe_name，供之後 replace_cid_images 使用
                         att['filename'] = safe_name
-                        
-                        img_data = base64.b64decode(content_bytes)
                         img_path = os.path.join(img_dir, safe_name)
-                        with open(img_path, 'wb') as img_f:
-                            img_f.write(img_data)
-                        print(f"Successfully saved image attachment: {img_path}")
-                        valid_attachments.append(att)
+                        
+                        # 優先級 1: 檔案內容 contentBytes 存在時直接在本機解碼儲存
+                        if content_bytes:
+                            os.makedirs(img_dir, exist_ok=True)
+                            img_data = base64.b64decode(content_bytes)
+                            with open(img_path, 'wb') as img_f:
+                                img_f.write(img_data)
+                            print(f"Successfully saved image attachment from bytes: {img_path}")
+                            valid_attachments.append(att)
+                            
+                        # 優先級 2: 分享連結 shareLink 存在時由 Actions 主動下載 (免 Premium 方案)
+                        elif share_link:
+                            os.makedirs(img_dir, exist_ok=True)
+                            print(f"Downloading image from shareLink: {share_link}")
+                            download_image_from_link(share_link, img_path)
+                            print(f"Successfully downloaded and saved image to: {img_path}")
+                            valid_attachments.append(att)
+                        else:
+                            print(f"Image metadata registered for cid rewriting: {safe_name}")
+                            valid_attachments.append(att)
+                            
                     except Exception as e:
-                        print(f"Error saving attachment {name}: {e}")
+                        print(f"Error processing attachment {name}: {e}")
                         
         # 5. 改寫正文中的 cid: 圖片連結
         if valid_attachments:

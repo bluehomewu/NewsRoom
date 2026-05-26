@@ -130,51 +130,82 @@ Jekyll 文章需要特定的 Front Matter（YAML 標頭）才能正常被解析�
    ```
    *(這會使 Power Automate 直接將郵件的原始 HTML 傳送給 GitHub Actions，由 GitHub 端的 Python 解析器自動轉換成 Markdown 粗體 `**文字**` 與圖片語法)*
 
-### 2. 圖片自動化上傳設定步驟（將 GitHub 儲存庫當成圖床）
-若要完全自動化處理郵件中的圖片附件，我們需要將圖片以 Base64 格式打包成陣列，隨同 HTTP 請求傳送給 GitHub Actions：
+### 2. 免費版圖片自動化發佈設定步驟（使用 OneDrive + GitHub 共同完成）
 
-1. **調整步驟 1 觸發器**：
-   - 點開 `Office 365 Outlook - 當新電子郵件抵達時 (V3)` 動作。
-   - 點選右上角「顯示進階選項」。
-   - 將 **「包含附件」** (Include Attachments) 設定為 **「是」** (Yes)。
+如果您在 Power Automate 中直接使用「HTTP」動作上傳圖片，會因為該動作屬於進階 (Premium) 功能而收到授權警告。為此，我們可以利用完全免費的 **OneDrive** (Standard 動作) 來暫存郵件中的圖片附件並產生分享連結，再由 GitHub Actions 自動下載圖片並發佈，如此一來既能免去 Premium 收費，又不會受到 GitHub 64 KB Payload 大小限制的干擾！
 
-2. **新增動作：初始化附件陣列變數**：
-   - 新增動作 `變數 - 初始化變數` (Initialize variable)。
-   - **名稱**：`ImageAttachments`
-   - **類型**：`陣列` (Array)
-   - **值**：保持空白。
+#### 1. 調整步驟 1 觸發器
+- 點開 `當新電子郵件抵達時 (V3)` 動作。
+- 點選最下方的 **「顯示進階選項」**（或進階參數）。
+- 將 **「加入附件」** (Include Attachments) 設定為 **「是」** (Yes)。
+- 確保 **「僅限包含附件」** (Only with Attachments) 為 **「否」**。
 
-3. **新增動作：遍歷附件並過濾圖片**：
-   - 在 `Compose_Markdown_Body` 步驟之前，新增動作 `控制 - Apply to each` (套用到每個)。
-   - **選取前一個步驟的輸出** (Select an output from previous steps)：選擇動態內容中的 **「附件」** (Attachments) 陣列。
-   - **在迴圈中新增一個「條件」** (Condition) 動作：
-     - 設定條件為：`附件內容類型` (Attachment Content-Type) **包含** `image/`。
-     - *(說明：這會過濾出所有的圖片附件，排除非圖片檔案)*
-   - **如果為是** (If yes) 的區塊中，新增動作 `變數 - 附加至陣列變數` (Append to array variable)：
-     - **名稱**：選擇 `ImageAttachments`。
-     - **值** (Value)：輸入以下 JSON：
-       ```json
-       {
-         "filename": "@{items('Apply_to_each')?['name']}",
-         "contentBytes": "@{items('Apply_to_each')?['contentBytes']}",
-         "contentType": "@{items('Apply_to_each')?['contentType']}",
-         "contentId": "@{items('Apply_to_each')?['contentId']}"
-       }
-       ```
-       *(注意：若介面為新版設計，可以直接在動態內容中選擇對應的「附件名稱」、「附件內容」、「附件內容類型」與「附件內容識別碼」)*
+#### 2. 初始化兩個關鍵變數
+在觸發器下方，點選 **「+ 新增步驟」**，搜尋 `變數`，並加入兩個 **「初始化變數」** 動作：
+- **變數一：PostBaseName** (字串變數)：用來作為圖片在 OneDrive 與 GitHub 中的資料夾名稱。
+  - **名稱**：`PostBaseName`
+  - **類型**：`字串`
+  - **值**（點選右側「運算式 Expression」輸入，然後按確定）：
+    ```text
+    concat(utcNow('yyyy-MM-dd'), '-', replace(replace(triggerBody()?['subject'], ' ', '_'), ':', '_'))
+    ```
+- **變數二：ImageAttachments** (陣列變數)：用來收集圖片資訊。
+  - **名稱**：`ImageAttachments`
+  - **類型**：`陣列`
+  - **值**：保持空白，什麼都不用填。
 
-4. **更新步驟 4：HTTP 請求 Body**：
-   - 修改最後 HTTP 動作的 **Body** 內容，將打包好的圖片陣列傳入 `attachments` 欄位：
-     ```json
-     {
-       "event_type": "new_press_release",
-       "client_payload": {
-         "filename": "@{variables('FileName')}",
-         "content": "@{base64(outputs('Compose_Markdown_Body'))}",
-         "attachments": @{variables('ImageAttachments')}
-       }
+#### 3. 新增套用到每個與條件過濾
+- 在 `Compose_Markdown_Body` 步驟之前，新增動作 `控制 - 套用到每個` (Apply to each)。
+- **選取前一個步驟的輸出**：點選輸入框，從動態內容中搜尋並選取 **「附件」** 陣列。
+- 在迴圈 **內部**，點選「新增動作」，搜尋 `控制` 並選擇 **「條件」** (Condition)：
+  - **左邊第一個格子**：選取動態內容中的 **「附件內容類型」** (ContentType)。
+  - **中間選單**：選擇 **「包含」** (contains)。
+  - **右邊第三個格子**：手動輸入文字 **`image/`**。
+
+#### 4. 在「如果是」 (If yes) 綠色區塊中新增三個動作
+點開條件下方 **「如果是」** 的綠色區塊，在內部依序新增以下三個動作：
+
+- **動作 A：OneDrive - 建立檔案**：
+  - 搜尋 **`OneDrive`**，選擇 **「建立檔案」** (Create file) 動作。
+  - **資料夾路徑**：輸入 `/NewsRoom/attachments/@{variables('PostBaseName')}`
+  - **檔案名稱**：點選動態內容中的 **「附件名稱」** (即 `@{item()?['name']}`)
+  - **檔案內容**：點選動態內容中的 **「附件內容」** (即 `@{item()?['contentBytes']}`)
+
+- **動作 B：OneDrive - 建立共用連結 (V2)**：
+  - 搜尋 **`OneDrive`**，選擇 **「建立共用連結 (V2)」** (Create share link (V2))。
+  - **檔案**：點選輸入框，在動態內容中尋找上一個動作「建立檔案」產生的 **「識別碼」** (Id)。
+  - **連結類型**：下拉選擇 **「僅限檢視」** (View)。
+  - **連結範圍**：下拉選擇 **「任何人」** (Anonymous) *(注意：必須是任何人，GitHub 才能免登入下載)*。
+
+- **動作 C：變數 - 附加至陣列變數**：
+  - 搜尋 **`變數`**，選擇 **「附加至陣列變數」**。
+  - **名稱**：選擇 **`ImageAttachments`**。
+  - **值**：複製貼上以下 JSON（將內容轉為 OneDrive 下載連結，實現 Payload 瘦身）：
+    ```json
+    {
+      "filename": "@{item()?['name']}",
+      "contentId": "@{item()?['contentId']}",
+      "shareLink": "@{outputs('建立共用連結_(V2)')?['body/link/webUrl']}"
+    }
+    ```
+    *(注意：若您的 OneDrive 動作名稱有調整，請點選動態內容中的「網頁 URL / WebUrl」標籤代替上面 JSON 中的 shareLink 運算式)*
+
+#### 5. 更新最後的「建立存放庫分派事件」
+1. 找到最下方的 **「建立存放庫分派事件」** 動作展開。
+2. 將 Body (或 client_payload) 修改為以下內容：
+   ```json
+   {
+     "event_type": "new_press_release",
+     "client_payload": {
+       "filename": "@{variables('FileName')}",
+       "content": "@{base64(outputs('Compose_Markdown_Body'))}",
+       "post_base_name": "@{variables('PostBaseName')}",
+       "attachments": 
      }
-     ```
-     *(注意：這裡的 `@{variables('ImageAttachments')}` 無需加雙引號，Power Automate 會自動將陣列變數序列化為 JSON 陣列帶入)*
+   }
+   ```
+   *(在 `"attachments":` 的冒號後面，不要加雙引號，直接點選動態內容中的 **`ImageAttachments`** 陣列變數)*
 
-這樣一來，GitHub 端的 Python 清理腳本就會自動在 `assets/img/posts/` 底下建立該文章的專屬目錄，將圖片解碼儲存，並自動將內文中的 `cid:` 連結改寫為相對於 Jekyll 網站的圖片路徑！您完全不需要手動上傳圖片到任何外部圖床。
+---
+
+這樣一來，圖片會先被存放在您的個人 OneDrive 中並產生公開下載網址，GitHub Actions 收到 Dispatch 事件後，Python 腳本會自動讀取網址將圖片下載並存入儲存庫中的 `assets/img/posts/` 底下，最後一併完成網站部署！這完全不需要任何付費授權，非常安全且全自動。

@@ -32,6 +32,7 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git add _posts/
           git add assets/img/posts/ 2>/dev/null || true
+          git pull origin master --rebase
           # 嚴格遵循 -s 簽署規範，且不加任何 AI 聯名署名
           git commit -s -m "chore(posts): publish new press release via email dispatch
 
