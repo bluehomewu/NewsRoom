@@ -57,8 +57,29 @@ def main():
         print("Usage: python clean_email.py <filename> <base64_content>")
         sys.exit(1)
         
-    raw_filename = sys.argv[1]
-    b64_content = sys.argv[2]
+    raw_filename = sys.argv[1].strip()
+    b64_content = sys.argv[2].strip()
+    
+    # 支援手動觸發 (workflow_dispatch) 時提供預設測試參數，防範 IsADirectoryError 空檔名錯誤
+    if not raw_filename:
+        import datetime
+        today = datetime.datetime.now().strftime('%Y-%m-%d')
+        raw_filename = f"{today}-manual-trigger-test.md"
+        
+    if not b64_content:
+        default_post = """---
+layout: post
+title: "手動測試：自動發佈工作流驗證"
+date: 2026-05-26 12:00:00 +0800
+categories: test
+---
+
+這是一篇透過 GitHub Actions 網頁端手動觸發（workflow_dispatch）產生的測試文章。
+
+如果您能在新聞首頁看到此文章，代表郵件發文與網站部署工作流皆正常運行！
+"""
+        b64_content = base64.b64encode(default_post.encode('utf-8')).decode('utf-8')
+
     
     # 1. 清洗檔名
     # 檔名格式通常為 YYYY-MM-DD-filename.md
