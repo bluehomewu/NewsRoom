@@ -263,10 +263,10 @@ def clean_body(body):
     result_body = "".join(cleaned_paragraphs).strip()
         
     # 移除 PR Contacts 聯絡資訊、長分隔線與免責聲明等尾部雜訊
-    # 1. 依長減號橫線截斷 (10個以上)
-    result_body = re.split(r'\n\s*-{10,}\s*\n', result_body)[0]
-    # 2. 依長等號橫線截斷 (10個以上)
-    result_body = re.split(r'\n\s*={10,}\s*\n', result_body)[0]
+    # 1. 依長減號橫線截斷 (10個以上，容許尾端有星號等標記)
+    result_body = re.split(r'\n\s*-{10,}.*', result_body)[0]
+    # 2. 依長等號橫線截斷 (10個以上，容許尾端有星號等標記)
+    result_body = re.split(r'\n\s*={10,}.*', result_body)[0]
     # 3. 依 PR Contacts 或 媒體/技術公關 關鍵字整行及之後截斷
     lines = result_body.split('\n')
     clean_lines = []
