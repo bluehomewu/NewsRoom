@@ -3,6 +3,7 @@ name: Publish Press Release Email
 on:
   repository_dispatch:
     types: [new_press_release]
+  workflow_dispatch:
 
 permissions:
   contents: write
