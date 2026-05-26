@@ -1,0 +1,150 @@
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7f7">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1b1b1e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta
+    name="viewport"
+    content="width=device-width, user-scalable=no initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
+  >
+
+  {%- capture seo_tags -%}
+    {% seo title=false %}
+  {%- endcapture -%}
+
+  <!-- =================================================================== -->
+  <!-- MODIFIED: 自訂社群分享圖片 (og:image) 的邏輯 (v4 - CORRECTED)      -->
+  <!-- =================================================================== -->
+  <!-- 優先級順序:                                                        -->
+  <!-- 1. Front Matter 中的 `page.image` (手動指定)                       -->
+  <!-- 2. 文章內容 `content` 中的第一張圖片 (自動抓取)                    -->
+  <!-- 3. _config.yml 中設定的全站預設圖片 `site.social_preview_image`    -->
+  <!-- =================================================================== -->
+
+  {%- assign share_image_path = nil -%}
+  {%- assign share_image_alt = nil -%}
+
+  {%- comment -%} --- 1. 檢查手動指定的圖片 --- {%- endcomment -%}
+  {%- if page.image -%}
+    {%- assign share_image_path = page.image.path | default: page.image -%}
+    {%- if page.image.alt -%}
+      {%- assign share_image_alt = page.image.alt -%}
+    {%- endif -%}
+
+  {%- comment -%} --- 2. 檢查文章內容的第一張圖片 --- {%- endcomment -%}
+  {%- elsif page.layout == "post" and page.content contains "<img src=" -%}
+    {%- assign content_parts = page.content | split: '<img' -%}
+    {%- if content_parts.size > 1 -%}
+      {%- assign first_img_tag_content = content_parts[1] | split: '>' | first -%}
+      {%- if first_img_tag_content contains 'src="' -%}
+        {%- assign img_src = first_img_tag_content | split: 'src="' | last | split: '"' | first -%}
+        {%- assign share_image_path = img_src -%}
+      {%- endif -%}
+      {%- if first_img_tag_content contains 'alt="' -%}
+        {%- assign img_alt = first_img_tag_content | split: 'alt="' | last | split: '"' | first -%}
+        {%- assign share_image_alt = img_alt -%}
+      {%- endif -%}
+    {%- endif -%}
+
+  {%- comment -%} --- 3. 使用全站預設圖片 --- {%- endcomment -%}
+  {%- elsif site.social_preview_image -%}
+    {%- assign share_image_path = site.social_preview_image -%}
+    {%- assign share_image_alt = page.title -%}
+  {%- endif -%}
+
+  {%- comment -%} --- 產生並插入最終的 meta 標籤 --- {%- endcomment -%}
+  {%- if share_image_path -%}
+    {%- capture final_image_url -%}
+      {% include media-url.html src=share_image_path subpath=page.media_subpath absolute=true %}
+    {%- endcapture -%}
+    
+    {%- capture custom_og_tags -%}
+      <meta property="og:image" content="{{ final_image_url | strip }}" />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta property="twitter:image" content="{{ final_image_url | strip }}" />
+      {%- if share_image_alt -%}
+        <meta property="og:image:alt" content="{{ share_image_alt | xml_escape }}">
+        <meta name="twitter:image:alt" content="{{ share_image_alt | xml_escape }}">
+      {%- endif -%}
+    {%- endcapture -%}
+
+    {% assign seo_tags = seo_tags | replace: '<meta name="twitter:card" content="summary" />', custom_og_tags %}
+  {%- endif -%}
+
+  {{ seo_tags }}
+
+  <title>
+    {%- unless page.layout == 'home' -%}
+      {{ page.title | append: ' | ' }}
+    {%- endunless -%}
+    {{ site.title }}
+  </title>
+
+  {% include_cached favicons.html %}
+
+  <!-- Resource Hints -->
+  {% unless site.assets.self_host.enabled %}
+    {% for hint in site.data.origin.cors.resource_hints %}
+      {% for link in hint.links %}
+        <link rel="{{ link.rel }}" href="{{ hint.url }}" {{ link.opts | join: ' ' }}>
+      {% endfor %}
+    {% endfor %}
+  {% endunless %}
+
+  <!-- Bootstrap -->
+  {% unless jekyll.environment == 'production' %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css">
+  {% endunless %}
+
+  <!-- Theme style -->
+  <link rel="stylesheet" href="{{ '/assets/css/:THEME.css' | replace: ':THEME', site.theme | relative_url }}">
+
+  <!-- Web Font -->
+  <link rel="stylesheet" href="{{ site.data.origin[type].webfonts | relative_url }}">
+
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="{{ site.data.origin[type].fontawesome.css | relative_url }}">
+
+  <!-- 3rd-party Dependencies -->
+
+  {% if site.toc and page.toc %}
+    <link rel="stylesheet" href="{{ site.data.origin[type].toc.css | relative_url }}">
+  {% endif %}
+
+  {% if page.layout == 'post' or page.layout == 'page' or page.layout == 'home' %}
+    <link rel="stylesheet" href="{{ site.data.origin[type]['lazy-polyfill'].css | relative_url }}">
+  {% endif %}
+
+  {% if page.layout == 'page' or page.layout == 'post' %}
+    <!-- Image Popup -->
+    <link rel="stylesheet" href="{{ site.data.origin[type].glightbox.css | relative_url }}">
+  {% endif %}
+
+  <!-- Scripts -->
+
+  <script src="{{ '/assets/js/dist/theme.min.js' | relative_url }}"></script>
+
+  {% include js-selector.html lang=lang %}
+
+  {% if jekyll.environment == 'production' %}
+    <!-- PWA -->
+    {% if site.pwa.enabled %}
+      <script
+        defer
+        src="{{ '/app.min.js' | relative_url }}?baseurl={{ site.baseurl | default: '' }}&register={{ site.pwa.cache.enabled }}"
+      ></script>
+    {% endif %}
+
+    <!-- Web Analytics -->
+    {% for analytics in site.analytics %}
+      {% capture str %}{{ analytics }}{% endcapture %}
+      {% assign platform = str | split: '{' | first %}
+      {% if site.analytics[platform].id and site.analytics[platform].id != empty %}
+        {% include analytics/{{ platform }}.html %}
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+
+  {% include metadata-hook.html %}
+</head>

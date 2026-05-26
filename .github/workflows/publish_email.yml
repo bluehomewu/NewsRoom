@@ -1,0 +1,35 @@
+name: Publish Press Release Email
+
+on:
+  repository_dispatch:
+    types: [new_press_release]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Create Posts Directory
+        run: mkdir -p _posts
+
+      - name: Decode and Save Content
+        run: |
+          echo "${{ github.event.client_payload.content }}" | base64 --decode > _posts/${{ github.event.client_payload.filename }}
+
+      - name: Commit and Push Changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add _posts/${{ github.event.client_payload.filename }}
+          # 嚴格遵循 -s 簽署規範，且不加任何 AI 聯名署名
+          git commit -s -m "chore(posts): publish new press release via email dispatch
+
+          Filename: ${{ github.event.client_payload.filename }}
+          Triggered by Repository Dispatch event."
+          git push origin master

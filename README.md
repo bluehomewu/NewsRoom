@@ -2,15 +2,17 @@
 
 NewsRoom 是一個專為發佈合作夥伴新聞稿設計的入口網站。網站託管於 GitHub Pages，並配置自訂網域部署於 `https://edwardwu23.com/NewsRoom/`。
 
-本專案特色在於完全**無伺服器架構 (Serverless)**，且後端整合 **Microsoft Power Automate**，實現發送電子郵件即可自動發佈新聞稿的無程式碼 (No-Code) 自動化流程。
+本專案採用 **Jekyll Chirpy 主題** 作為視覺架構，並完全整合 **Microsoft Power Automate** 與 **GitHub Actions**，實現「發送電子郵件即可自動發佈新聞稿」的無程式碼 (No-Code) 發佈管道。
 
 ---
 
-## 專案架構
+## 專案與自動化架構
 
-- **靜態網站產生器 (SSG)**：Jekyll
-- **樣式設計**：客製化 CSS（位於 `assets/css/style.css`），採用現代玻璃帷幕與深色質感主題。
-- **自動化發佈管道**：當新郵件寄送至 `NewsRoom@edwardwu23.com` 時，Power Automate 會自動轉換內文，並透過 GitHub REST API 寫入 `_posts/` 目錄中。
+1. **Jekyll Chirpy 主題**：提供精美的響應式版面、側邊欄導覽、全站即時搜尋、分類/標籤頁面與深淺色模式切換。
+2. **自動化發佈管道**：當合作夥伴寄信到 `NewsRoom@edwardwu23.com` 時：
+   - Power Automate 會捕捉此信件，將內文轉換為 Markdown，並向本倉庫發送 `Repository Dispatch` 事件。
+   - GitHub Actions (`publish_email.yml`) 接收信號，解碼 Base64 內文並將文章寫入 `_posts/` 目錄。
+   - 提交 Commit 後，自動觸發 `Build and Deploy` 部署網站。
 
 ---
 
@@ -18,34 +20,33 @@ NewsRoom 是一個專為發佈合作夥伴新聞稿設計的入口網站。網�
 
 ```text
 NewsRoom/
-├── _posts/                    # 由 Power Automate 自動寫入的新聞稿
-├── _layouts/                  # Jekyll 網站版面配置
-│   ├── default.html           # 基礎 HTML5 骨架（含導覽列、頁尾與響應式 CSS）
-│   └── post.html              # 新聞稿單頁佈局
-├── assets/                    # 靜態資源
-│   └── css/
-│       └── style.css          # 自訂現代質感 CSS 樣式表
-├── _config.yml                # Jekyll 網站設定檔
-├── AGENTS.md                  # 本地 AI 代理引導指南
+├── _posts/                    # 新聞稿文章目錄
+├── _layouts/                  # Chirpy 佈局範本
+├── _includes/                 # Chirpy 網頁組件（含客製動態 og:image 分享縮圖邏輯）
+├── _tabs/                     # 側邊欄主要分頁（首頁、關於、分類、標籤、存檔）
+├── assets/                    # 靜態資源（Favicon、樣式與 JS）
+├── tools/                     # Chirpy 輔助指令碼
+├── _config.yml                # Jekyll 設定檔（已設定 baseurl: /NewsRoom 與排除項）
+├── Gemfile                    # 專案依賴套件檔
 ├── README.md                  # 本說明文件
-└── POWER_AUTOMATE_GUIDE.md    # Power Automate 雲端工作流設定指南
+└── POWER_AUTOMATE_GUIDE.md    # Power Automate 設定教學指南
 ```
 
 ---
 
-## 本地預覽與開發
+## 本地開發與預覽
 
 若要在本地環境中啟動並預覽網站，請遵循以下步驟：
 
-### 1. 安裝 Ruby 依賴套件
+### 1. 安裝套件依賴
 
-本專案使用 Bundler 管理套件依賴。請在專案根目錄下執行：
+請在專案根目錄下執行：
 
 ```bash
 bundle install
 ```
 
-### 2. 啟動 Jekyll 伺服器
+### 2. 啟動 Jekyll 本地伺服器
 
 執行以下指令啟動 Jekyll 本地開發伺服器：
 
@@ -56,7 +57,7 @@ bundle exec jekyll serve
 伺服器啟動後，請在瀏覽器中開啟：
 [http://localhost:4000/NewsRoom/](http://localhost:4000/NewsRoom/)
 
-*(注意：由於 `_config.yml` 中設定了 `baseurl: "/NewsRoom"`，本地預覽路徑亦會包含 `/NewsRoom`字樣)*
+*(注意：由於設定了 `baseurl: "/NewsRoom"`，本地預覽路徑亦會包含 `/NewsRoom` 字樣)*
 
 ---
 
