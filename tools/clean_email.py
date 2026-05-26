@@ -139,6 +139,10 @@ def clean_body(body):
     else:
         result_body = body.strip()
         
+    # 移除開頭常見的媒體朋友招呼語
+    greeting_pattern = r'^\s*(親愛的|各位)?媒體朋友\s*[：，,:]?\s*\n+'
+    result_body = re.sub(greeting_pattern, '', result_body, flags=re.IGNORECASE).strip()
+        
     # 段落重新拼裝與超連結格式化
     # 將內文以空行拆分成多個段落
     paragraphs = re.split(r'(\n\s*\n+)', result_body)
