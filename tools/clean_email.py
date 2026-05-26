@@ -313,7 +313,11 @@ def replace_cid_images(text, attachments, post_base_name):
         # 尋找匹配的附件
         matched_attachment = None
         for att in attachments:
-            att_name = att.get('filename', '').strip()
+            # 使用 original_filename 進行名稱匹配，因為 original_filename 保留了原始郵件中的長檔名
+            att_name = att.get('original_filename', '').strip()
+            if not att_name:
+                att_name = att.get('filename', '').strip()
+                
             att_cid = att.get('contentId', '')
             if att_cid:
                 att_cid = att_cid.strip('<>')
@@ -328,12 +332,12 @@ def replace_cid_images(text, attachments, post_base_name):
                 matched_attachment = att
                 break
                 
-            # 3. cid 在附件檔名之中 (例如 cid: image001.png 去匹配 image001.png)
+            # 3. cid 在附件檔名之中
             if att_name and cid_value_clean.lower() in att_name.lower():
                 matched_attachment = att
                 break
                 
-            # 4. 去除副檔名後的檔名匹配 (例如 cid: image001 去匹配 image001.png)
+            # 4. 去除副檔名後的檔名匹配
             att_name_no_ext = os.path.splitext(att_name)[0]
             cid_value_no_ext = os.path.splitext(cid_value_clean)[0]
             if att_name_no_ext and att_name_no_ext.lower() == cid_value_no_ext.lower():
@@ -341,10 +345,9 @@ def replace_cid_images(text, attachments, post_base_name):
                 break
                 
         if matched_attachment:
-            att_name = matched_attachment.get('filename')
-            # 替換為 Jekyll 的相對路徑，使用 url 解碼以防路徑在 Jekyll 部署時解析錯誤
-            # 這邊直接輸出為 site.baseurl 的相對路徑
-            return f"{{{{ site.baseurl }}}}/assets/img/posts/{post_base_name}/{att_name}"
+            # 替換為重新命名後的安全檔名 filename (例如 image_1.jpg)
+            safe_name = matched_attachment.get('filename')
+            return f"{{{{ site.baseurl }}}}/assets/img/posts/{post_base_name}/{safe_name}"
         else:
             print(f"Warning: Could not find matching attachment for CID: {cid_value}")
             return match.group(0) # 保持原樣
@@ -454,6 +457,7 @@ categories: test
         
         if attachments:
             img_dir = os.path.join('assets', 'img', 'posts', post_base_name)
+            img_index = 1
             
             for att in attachments:
                 name = att.get('filename', '').strip()
@@ -475,9 +479,18 @@ categories: test
                         
                 if is_image:
                     try:
-                        # 將空白與冒號替換為安全字元，以免造成路徑問題
-                        safe_name = name.replace(':', '_').replace(' ', '_')
-                        # 更新附件檔名為 safe_name，供之後 replace_cid_images 使用
+                        # 儲存原始檔名用於之後的 cid 匹配
+                        att['original_filename'] = name
+                        
+                        # 將實體圖片重新命名為安全檔名 (例如 image_1.jpg)
+                        # 避免超長中文字與全形標點在 Jekyll 和 URL 解析時壞掉
+                        _, ext = os.path.splitext(name.lower())
+                        if not ext:
+                            ext = '.jpg'
+                        safe_name = f"image_{img_index}{ext}"
+                        img_index += 1
+                        
+                        # 更新附件檔名為 safe_name
                         att['filename'] = safe_name
                         img_path = os.path.join(img_dir, safe_name)
                         
@@ -510,18 +523,26 @@ categories: test
             clean_body_text = replace_cid_images(clean_body_text, valid_attachments, post_base_name)
             
             # 檢查哪些 valid_attachments 檔案沒有被 html 的 img 標籤引用
-            # （意即它們的檔名沒有出現在已重寫完的 clean_body_text 中）
+            # 由於在正文中被引用的圖片會被取代為包含安全名稱 (如 image_1.jpg) 的連結
+            # 我們可以比對 clean_body_text 是否包含 safe_name
             for att in valid_attachments:
-                att_name = att.get('filename')
-                if att_name and att_name not in clean_body_text:
+                safe_name = att.get('filename')
+                if safe_name and safe_name not in clean_body_text:
                     referenced_images.append(att)
                     
         # 若有未被正文引用的圖片附件（例如信件直接以附件發送而 HTML 中無 img 元素），則自動追加到文章尾端
         if referenced_images:
             clean_body_text += "\n\n---\n\n### 相關圖片\n\n"
             for att in referenced_images:
-                att_name = att.get('filename')
-                clean_body_text += f"![{att_name}]({{{{ site.baseurl }}}}/assets/img/posts/{post_base_name}/{att_name})\n\n"
+                safe_name = att.get('filename')
+                original_name = att.get('original_filename', '圖片')
+                
+                # 簡短 alt 說明 (去副檔名，並限制長度最長 30 個字)
+                alt_text = os.path.splitext(original_name)[0]
+                if len(alt_text) > 30:
+                    alt_text = alt_text[:30] + "..."
+                    
+                clean_body_text += f"![{alt_text}]({{{{ site.baseurl }}}}/assets/img/posts/{post_base_name}/{safe_name})\n\n"
             
         final_content = f"---\n{clean_front_matter}---\n\n{clean_body_text}"
     else:
