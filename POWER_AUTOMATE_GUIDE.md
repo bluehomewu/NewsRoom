@@ -130,11 +130,38 @@ Jekyll 文章需要特定的 Front Matter（YAML 標頭）才能正常被解析�
    ```
    *(這會使 Power Automate 直接將郵件的原始 HTML 傳送給 GitHub Actions，由 GitHub 端的 Python 解析器自動轉換成 Markdown 粗體 `**文字**` 與圖片語法)*
 
-### 2. 圖片自動化發佈設定步驟（直接傳送附件 Base64 內容）
+### 2. 圖片自動化發佈設定步驟（OneDrive 暫存 + GitHub Actions 自動下載）
 
-> **原理說明**：Power Automate 的郵件觸發器會自動將附件以 Base64 格式提供（`contentBytes`）。我們只需要將這些 Base64 資料打包進 GitHub Repository Dispatch 的 `client_payload` 中，由 GitHub Actions 端的 Python 腳本自動解碼並儲存為圖片檔案。
+> **原理說明**：GitHub Repository Dispatch 的 `client_payload` 限制僅約 **10 KB**，無法直接傳送圖片的 Base64 資料。因此我們採用以下策略：
+> 1. Power Automate 將郵件的圖片附件上傳至 **OneDrive** 暫存（Standard 動作，免費）
+> 2. 在 Payload 中只傳送**檔案路徑字串**（幾十 bytes，遠低於限制）
+> 3. GitHub Actions 透過 **Microsoft Graph API**（已認證的 OAuth）從 OneDrive 下載實際圖片
 >
-> **⚠️ 注意：不要使用 OneDrive 分享連結方式！** OneDrive 的 `webUrl` 分享連結在伺服器端無法直接下載（會收到 HTML 登入頁面而非圖片），因此本流程直接傳送附件內容。
+> **⚠️ 注意**：不要嘗試直接在 Payload 中塞 `contentBytes`（會超過 10KB 限制），也不要使用 OneDrive 分享連結（伺服器端下載會收到 HTML 登入頁面）。
+
+---
+
+#### 事前準備：Azure AD 應用程式註冊（一次性設定，約 5 分鐘）
+
+為了讓 GitHub Actions 能夠安全地從 OneDrive 下載圖片，需要註冊一個 Azure AD 應用程式：
+
+1. 前往 [Azure Portal - 應用程式註冊](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade)
+2. 點選 **「新增註冊」**：
+   - **名稱**：`NewsRoom-GitHub-Actions`
+   - **支援的帳戶類型**：選擇「僅此組織目錄中的帳戶」
+   - 點選「註冊」
+3. 註冊完成後，記下頁面上的：
+   - **應用程式 (用戶端) 識別碼** → 稍後填入 `AZURE_CLIENT_ID`
+   - **目錄 (租用戶) 識別碼** → 稍後填入 `AZURE_TENANT_ID`
+4. 左側選單 → **憑證與密碼** → **新增用戶端密碼** → 記下密碼值 → 稍後填入 `AZURE_CLIENT_SECRET`
+5. 左側選單 → **API 權限** → **新增權限** → **Microsoft Graph** → **應用程式權限** → 搜尋 `Files.Read.All` → 勾選並新增 → 最後點選 **「代表 [組織名稱] 授與管理員同意」**
+6. 前往 [Azure AD 使用者列表](https://portal.azure.com/#blade/Microsoft_AAD_IAM/UsersManagementMenuBlade/AllUsers)，找到擁有 OneDrive 的使用者，記下其 **物件識別碼 (Object ID)** 或 **使用者主體名稱 (UPN)** → 稍後填入 `ONEDRIVE_USER_ID`
+
+接著在 GitHub 儲存庫設定 Secrets：
+- 前往 GitHub Repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
+- 依序新增：`AZURE_TENANT_ID`、`AZURE_CLIENT_ID`、`AZURE_CLIENT_SECRET`、`ONEDRIVE_USER_ID`
+
+---
 
 #### 1. 調整步驟 1 觸發器
 - 點開 `當新電子郵件抵達時 (V3)` 動作。
@@ -144,7 +171,7 @@ Jekyll 文章需要特定的 Front Matter（YAML 標頭）才能正常被解析�
 
 #### 2. 初始化兩個關鍵變數
 在觸發器下方，點選 **「+ 新增步驟」**，搜尋 `變數`，並加入兩個 **「初始化變數」** 動作：
-- **變數一：PostBaseName** (字串變數)：用來作為圖片在 GitHub 中的資料夾名稱。
+- **變數一：PostBaseName** (字串變數)：用來作為圖片在 OneDrive 與 GitHub 中的資料夾名稱。
   - **名稱**：`PostBaseName`
   - **類型**：`字串`
   - **值**（點選右側「運算式 Expression」輸入，然後按確定）：
@@ -164,10 +191,18 @@ Jekyll 文章需要特定的 Front Matter（YAML 標頭）才能正常被解析�
   - **中間選單**：選擇 **「包含」** (contains)。
   - **右邊第三個格子**：手動輸入文字 **`image/`**。
 
-#### 4. 在「如果是」 (If yes) 綠色區塊中新增動作
-點開條件下方 **「如果是」** 的綠色區塊，在內部新增以下動作：
+> **⚠️ 重要**：這個條件過濾非常關鍵！它確保只有圖片附件（如 `.jpg`、`.png`）會被處理，`.doc`、`.pdf` 等非圖片檔案會被跳過，避免 Payload 爆量。
 
-- **動作：變數 - 附加至陣列變數**：
+#### 4. 在「如果是」 (If yes) 綠色區塊中新增兩個動作
+點開條件下方 **「如果是」** 的綠色區塊，在內部依序新增以下動作：
+
+- **動作 A：OneDrive - 建立檔案**：
+  - 搜尋 **`OneDrive`**，選擇 **「建立檔案」** (Create file) 動作。
+  - **資料夾路徑**：輸入 `/NewsRoom/attachments/@{variables('PostBaseName')}`
+  - **檔案名稱**：點選動態內容中的 **「附件名稱」** (即 `@{item()?['name']}`)
+  - **檔案內容**：點選動態內容中的 **「附件內容」** (即 `@{item()?['contentBytes']}`)
+
+- **動作 B：變數 - 附加至陣列變數**：
   - 搜尋 **`變數`**，選擇 **「附加至陣列變數」**。
   - **名稱**：選擇 **`ImageAttachments`**。
   - **值**：複製貼上以下 JSON：
@@ -175,11 +210,11 @@ Jekyll 文章需要特定的 Front Matter（YAML 標頭）才能正常被解析�
     {
       "filename": "@{item()?['name']}",
       "contentId": "@{item()?['contentId']}",
-      "contentBytes": "@{item()?['contentBytes']}"
+      "onedrive_path": "/NewsRoom/attachments/@{variables('PostBaseName')}/@{item()?['name']}"
     }
     ```
 
-> **⚡ 與之前的差異**：不再需要 OneDrive「建立檔案」和「建立共用連結」動作！直接將 `contentBytes`（附件的 Base64 編碼內容）放入陣列中即可。如果您的流程中有 OneDrive 相關動作，可以安全地刪除它們。
+> **💡 說明**：`onedrive_path` 只是一段路徑文字字串（幾十 bytes），不包含圖片資料本身。GitHub Actions 會透過 Microsoft Graph API 使用此路徑來下載實際圖片。
 
 #### 5. 更新最後的「建立存放庫分派事件」
 1. 找到最下方的 **「建立存放庫分派事件」** 動作展開。
@@ -196,5 +231,5 @@ Jekyll 文章需要特定的 Front Matter（YAML 標頭）才能正常被解析�
 
 ---
 
-> **💡 大小限制說明**：GitHub Repository Dispatch 的 Payload 上限為 **25 MB**。一般新聞稿附件的圖片（經過郵件壓縮後通常每張 100KB-2MB）完全在此限制範圍內。若單封郵件的圖片附件總量超過 25 MB，建議將部分大圖改為外部連結。
+> **💡 Payload 大小說明**：每個附件僅佔用約 100-200 bytes 的路徑字串，即使有 10 張圖片也僅約 2 KB，完全在 `client_payload` 的 10 KB 限制範圍內。實際圖片資料由 GitHub Actions 在伺服器端透過已認證的 Graph API 直接從 OneDrive 下載，不受 Payload 限制。
 

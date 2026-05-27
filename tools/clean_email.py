@@ -3,6 +3,8 @@ import json
 import os
 import re
 import sys
+import urllib.request
+import urllib.parse
 from html.parser import HTMLParser
 
 class HTMLToMarkdown(HTMLParser):
@@ -305,6 +307,82 @@ def is_valid_image_data(data):
     return False
 
 
+def get_graph_api_token():
+    """透過 Azure AD client_credentials 流程取得 Microsoft Graph API 的 Access Token"""
+    tenant_id = os.environ.get('AZURE_TENANT_ID', '')
+    client_id = os.environ.get('AZURE_CLIENT_ID', '')
+    client_secret = os.environ.get('AZURE_CLIENT_SECRET', '')
+    
+    if not all([tenant_id, client_id, client_secret]):
+        print("WARNING: Azure AD credentials not configured. OneDrive download will be skipped.")
+        return None
+        
+    token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+    data = urllib.parse.urlencode({
+        'client_id': client_id,
+        'scope': 'https://graph.microsoft.com/.default',
+        'client_secret': client_secret,
+        'grant_type': 'client_credentials'
+    }).encode('utf-8')
+    
+    try:
+        req = urllib.request.Request(token_url, data=data, method='POST')
+        req.add_header('Content-Type', 'application/x-www-form-urlencoded')
+        with urllib.request.urlopen(req) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            token = result.get('access_token')
+            if token:
+                print("Successfully obtained Graph API access token.")
+            return token
+    except Exception as e:
+        print(f"Error obtaining Graph API token: {e}")
+        return None
+
+
+def download_from_onedrive(file_path, save_path, access_token):
+    """透過 Microsoft Graph API 從 OneDrive 下載檔案"""
+    user_id = os.environ.get('ONEDRIVE_USER_ID', '')
+    if not user_id:
+        print("WARNING: ONEDRIVE_USER_ID not configured.")
+        return False
+        
+    # 將路徑中的特殊字元進行 URL 編碼，但保留斜線
+    encoded_path = urllib.parse.quote(file_path, safe='/')
+    
+    # Graph API endpoint: 透過路徑取得檔案內容
+    download_url = f"https://graph.microsoft.com/v1.0/users/{user_id}/drive/root:{encoded_path}:/content"
+    
+    try:
+        req = urllib.request.Request(download_url)
+        req.add_header('Authorization', f'Bearer {access_token}')
+        
+        with urllib.request.urlopen(req) as response:
+            file_data = response.read()
+            
+            # 驗證下載的資料是有效圖片
+            if not is_valid_image_data(file_data):
+                print(f"WARNING: Downloaded data from {file_path} is NOT a valid image.")
+                print(f"  Content-Type: {response.headers.get('Content-Type', 'unknown')}")
+                print(f"  First 100 bytes: {file_data[:100]}")
+                return False
+            
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            with open(save_path, 'wb') as f:
+                f.write(file_data)
+            print(f"Successfully downloaded from OneDrive ({len(file_data)} bytes): {save_path}")
+            return True
+    except urllib.error.HTTPError as e:
+        print(f"HTTP Error downloading from OneDrive: {e.code} {e.reason}")
+        if e.code == 404:
+            print(f"  File not found: {file_path}")
+        elif e.code == 401:
+            print(f"  Authentication failed. Check Azure AD credentials.")
+        return False
+    except Exception as e:
+        print(f"Error downloading from OneDrive: {e}")
+        return False
+
+
 def replace_cid_images(text, attachments, post_base_name):
     # 尋找所有 cid: 連結，格式通常是 ![alt](cid:xxx) 或 [alt](cid:xxx)
     # 我們用正則表達式找出 cid: 後面直到 ) 或 空格 的字串
@@ -470,10 +548,17 @@ categories: test
             img_dir = os.path.join('assets', 'img', 'posts', post_base_name)
             img_index = 1
             
+            # 預先取得 Graph API token（若有 OneDrive 路徑的附件才需要）
+            has_onedrive = any(att.get('onedrive_path') for att in attachments)
+            graph_token = None
+            if has_onedrive:
+                graph_token = get_graph_api_token()
+            
             for att in attachments:
                 name = att.get('filename', '').strip()
                 content_bytes = att.get('contentBytes', '')
                 content_type = att.get('contentType', '')
+                onedrive_path = att.get('onedrive_path', '').strip()
                 
                 if not name:
                     continue
@@ -487,43 +572,58 @@ categories: test
                     if ext in ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'):
                         is_image = True
                         
-                if is_image:
-                    try:
-                        # 儲存原始檔名用於之後的 cid 匹配
-                        att['original_filename'] = name
+                if not is_image:
+                    print(f"Skipping non-image attachment: {name}")
+                    continue
                         
-                        # 將實體圖片重新命名為安全檔名 (例如 image_1.jpg)
-                        # 避免超長中文字與全形標點在 Jekyll 和 URL 解析時壞掉
-                        _, ext = os.path.splitext(name.lower())
-                        if not ext:
-                            ext = '.jpg'
-                        safe_name = f"image_{img_index}{ext}"
-                        img_index += 1
-                        
-                        # 更新附件檔名為 safe_name
-                        att['filename'] = safe_name
-                        img_path = os.path.join(img_dir, safe_name)
-                        
-                        # 從 contentBytes (Base64) 解碼並儲存圖片
-                        if content_bytes:
-                            os.makedirs(img_dir, exist_ok=True)
+                try:
+                    # 儲存原始檔名用於之後的 cid 匹配
+                    att['original_filename'] = name
+                    
+                    # 將實體圖片重新命名為安全檔名 (例如 image_1.jpg)
+                    # 避免超長中文字與全形標點在 Jekyll 和 URL 解析時壞掉
+                    _, ext = os.path.splitext(name.lower())
+                    if not ext:
+                        ext = '.jpg'
+                    safe_name = f"image_{img_index}{ext}"
+                    img_index += 1
+                    
+                    # 更新附件檔名為 safe_name
+                    att['filename'] = safe_name
+                    img_path = os.path.join(img_dir, safe_name)
+                    saved = False
+                    
+                    # 優先級 1: contentBytes 存在時直接解碼儲存（適用於小圖片直接內嵌的情況）
+                    if content_bytes:
+                        try:
                             img_data = base64.b64decode(content_bytes)
-                            
-                            # 驗證解碼後的資料確實是圖片，而非 HTML 頁面等錯誤內容
-                            if not is_valid_image_data(img_data):
-                                print(f"WARNING: Decoded data for {name} is NOT a valid image (possibly HTML). Skipping.")
-                                print(f"  First 100 bytes: {img_data[:100]}")
-                                continue
-                                
-                            with open(img_path, 'wb') as img_f:
-                                img_f.write(img_data)
-                            print(f"Successfully saved image ({len(img_data)} bytes): {img_path}")
+                            if is_valid_image_data(img_data):
+                                os.makedirs(img_dir, exist_ok=True)
+                                with open(img_path, 'wb') as img_f:
+                                    img_f.write(img_data)
+                                print(f"Successfully saved image from contentBytes ({len(img_data)} bytes): {img_path}")
+                                valid_attachments.append(att)
+                                saved = True
+                            else:
+                                print(f"WARNING: contentBytes for {name} is NOT a valid image. Trying OneDrive...")
+                        except Exception as e:
+                            print(f"WARNING: Failed to decode contentBytes for {name}: {e}. Trying OneDrive...")
+                    
+                    # 優先級 2: 透過 Microsoft Graph API 從 OneDrive 下載
+                    if not saved and onedrive_path and graph_token:
+                        os.makedirs(img_dir, exist_ok=True)
+                        if download_from_onedrive(onedrive_path, img_path, graph_token):
                             valid_attachments.append(att)
-                        else:
-                            print(f"WARNING: No contentBytes for attachment {name}. Skipping image save.")
-                            
-                    except Exception as e:
-                        print(f"Error processing attachment {name}: {e}")
+                            saved = True
+                    
+                    if not saved:
+                        if not content_bytes and not onedrive_path:
+                            print(f"WARNING: No contentBytes or onedrive_path for {name}. Skipping.")
+                        elif not saved and onedrive_path and not graph_token:
+                            print(f"WARNING: OneDrive path provided but Graph API token unavailable. Skipping {name}.")
+                        
+                except Exception as e:
+                    print(f"Error processing attachment {name}: {e}")
                         
         # 5. 改寫正文中的 cid: 圖片連結，並收集未在正文中引用的圖片
         referenced_images = []

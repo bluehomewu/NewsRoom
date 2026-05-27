@@ -23,6 +23,10 @@ jobs:
         id: clean_step
         env:
           PAYLOAD_JSON: ${{ toJson(github.event.client_payload) }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ONEDRIVE_USER_ID: ${{ secrets.ONEDRIVE_USER_ID }}
         run: |
           python tools/clean_email.py
 
